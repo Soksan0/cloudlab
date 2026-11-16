@@ -64,8 +64,26 @@ export type Metrics = {
 
 export type LogEntry = { id: number; time: number; tone: 'info' | 'good' | 'warn'; text: string }
 
+export type TutorialState = {
+  status: 'welcome' | 'active' | 'complete' | 'skipped'
+  step: number
+  phase: 'explain' | 'demo' | 'action'
+  demoRemaining: number
+  replay: boolean
+  demonstrated: boolean
+}
+
+export type AdvisorRecommendation = {
+  id: string
+  title: string
+  reason: string
+  upgradeId?: UpgradeId
+  target: string
+  priority: 'capacity' | 'risk' | 'healthy'
+}
+
 export type GameState = {
-  version: 1
+  version: 2
   cash: number
   reputation: number
   elapsed: number
@@ -77,6 +95,12 @@ export type GameState = {
   policyCooldownUntil: number
   tutorialStep: number
   tutorialComplete: boolean
+  tutorial: TutorialState
+  upgradeTimes: Partial<Record<UpgradeId, number>>
+  cloudProvisioned: number
+  aiProvisioned: number
+  scaleTimer: number
+  incidentQueue: IncidentKind[]
   incident: Incident | null
   triggered: IncidentKind[]
   nextIncidentAt: number

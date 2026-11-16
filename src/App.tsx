@@ -1,299 +1,260 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import type { ReactNode } from 'react'
 import {
-  createInitialState, inspectDiagnostics, loadGame, purchaseUpgrade, serializeGame,
-  setPolicy, setSpeed, startChallenge, stepGame, togglePause,
+  createInitialState, loadGame, purchaseUpgrade, serializeGame, setPolicy, setSpeed,
+  startChallenge, stepGame, togglePause, startTutorial, advanceTutorial, skipTutorial,
+  replayTutorial, getTutorialLesson, getRecommendation, getPurchaseAdvice, getChallengeReadiness,
+  canPurchase, getEffectiveUpgrades,
 } from './sim/engine'
 import { UPGRADES, upgradeById } from './sim/upgrades'
-import type { GameState, Metrics, PolicyState, UpgradeId } from './sim/types'
+import type { GameState, PolicyState, UpgradeId } from './sim/types'
+import InfrastructureMap from './InfrastructureMap'
 
 const SAVE_KEY = 'cloudlab-save-v1'
+const money = (n: number) => '$' + n.toLocaleString(undefined, { maximumFractionDigits: Math.abs(n) < 100 ? 1 : 0 })
+const num = (n: number) => n.toLocaleString(undefined, { maximumFractionDigits: 1 })
+const stageName = (s: string) => s === 'compute' ? 'CPU' : s.charAt(0).toUpperCase() + s.slice(1)
 
-const money = (value: number) => {
-  if (Math.abs(value) >= 1_000_000) return `$${(value / 1_000_000).toFixed(2)}M`
-  if (Math.abs(value) >= 10_000) return `$${(value / 1_000).toFixed(1)}K`
-  return `$${value.toLocaleString(undefined, { maximumFractionDigits: value < 100 ? 1 : 0 })}`
-}
-const num = (value: number) => value.toLocaleString(undefined, { maximumFractionDigits: 1 })
-const clock = (elapsed: number) => `DAY ${Math.floor(elapsed / 24) + 1} · ${String(Math.floor(elapsed % 24)).padStart(2, '0')}:00`
-
-function useGame() {
+function useGame(suspended: boolean) {
+  const [notice, setNotice] = useState('')
   const [state, setState] = useState<GameState>(() => {
-    const saved = localStorage.getItem(SAVE_KEY)
-    return saved ? loadGame(saved) ?? createInitialState() : createInitialState()
+    try { const save = localStorage.getItem(SAVE_KEY); return save ? loadGame(save) ?? createInitialState() : createInitialState() }
+    catch { return createInitialState() }
   })
-  const stateRef = useRef(state)
-  stateRef.current = state
-
+  const current = useRef(state); current.current = state
+  const suspension = useRef(suspended); suspension.current = suspended
+  const save = useCallback(() => {
+    try { localStorage.setItem(SAVE_KEY, serializeGame(current.current)) }
+    catch { setNotice('Autosave is unavailable. Use Save to copy an export before leaving.') }
+  }, [])
   useEffect(() => {
-    let frame = 0
-    let previous = performance.now()
-    let accumulator = 0
+    let frame: number, previous = performance.now(), accumulator = 0
     const loop = (now: number) => {
-      const elapsed = Math.min(.5, (now - previous) / 1000)
-      previous = now; accumulator += elapsed
-      if (accumulator >= .1) {
-        const dt = accumulator; accumulator = 0
-        setState((current) => stepGame(current, dt))
+      const dt = Math.max(0, (now - previous) / 1000); previous = now
+      if (document.hidden || suspension.current) accumulator = 0
+      else {
+        accumulator += Math.min(dt, 1)
+        if (accumulator >= .1) { const delta = accumulator; accumulator = 0; setState(s => stepGame(s, delta)) }
       }
       frame = requestAnimationFrame(loop)
     }
+    const visibility = () => { previous = performance.now(); accumulator = 0; if (document.hidden) save() }
     frame = requestAnimationFrame(loop)
-    return () => cancelAnimationFrame(frame)
-  }, [])
-
-  useEffect(() => {
-    const save = () => localStorage.setItem(SAVE_KEY, serializeGame(stateRef.current))
-    const timer = window.setInterval(save, 10_000)
+    document.addEventListener('visibilitychange', visibility)
     window.addEventListener('pagehide', save)
-    return () => { window.clearInterval(timer); window.removeEventListener('pagehide', save) }
-  }, [])
+    const timer = window.setInterval(save, 10_000)
+    return () => { cancelAnimationFrame(frame); clearInterval(timer); document.removeEventListener('visibilitychange', visibility); window.removeEventListener('pagehide', save) }
+  }, [save])
+  useEffect(save, [save, state.upgrades.length, state.paused, state.speed, state.tutorial.status, state.tutorial.step, state.tutorial.phase, state.challenge.active, state.challenge.result, state.policies])
+  return { state, setState, notice }
+}
 
+function Modal({ title, eyebrow, children, close }: { title: string; eyebrow: string; children: ReactNode; close?: () => void }) {
+  const ref = useRef<HTMLElement>(null)
   useEffect(() => {
-    localStorage.setItem(SAVE_KEY, serializeGame(state))
-  }, [state.upgrades.length, state.tutorialComplete, state.challenge.result, state.policies])
-
-  return { state, setState }
+    const previous = document.activeElement as HTMLElement | null
+    const node = ref.current!
+    const focusable = () => [...node.querySelectorAll<HTMLElement>('button:not(:disabled),textarea,a[href],[tabindex="0"]')]
+    ;(node.querySelector<HTMLElement>('.primary') ?? focusable()[0] ?? node).focus()
+    const key = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && close) { e.preventDefault(); close() }
+      if (e.key === 'Tab') {
+        const items = focusable(); const first = items[0], last = items.at(-1)
+        if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last?.focus() }
+        else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first?.focus() }
+      }
+    }
+    node.addEventListener('keydown', key)
+    return () => { node.removeEventListener('keydown', key); previous?.focus() }
+  }, [close])
+  return <div className="modal-backdrop"><section ref={ref} className="save-dialog welcome-dialog" role="dialog" aria-modal="true" aria-labelledby="dialog-title" tabIndex={-1}>
+    <header><div><span className="eyebrow">{eyebrow}</span><h2 id="dialog-title">{title}</h2></div>{close && <button className="icon-button" onClick={close} aria-label="Close">×</button>}</header>{children}
+  </section></div>
 }
 
-function Stat({ label, value, hint, tone = '' }: { label: string; value: string; hint?: string; tone?: string }) {
-  return <div className={`stat ${tone}`} title={hint}><span>{label}</span><strong>{value}</strong></div>
+function SaveDialog({ state, close, onImport }: { state: GameState; close: () => void; onImport: (s: GameState) => void }) {
+  const [value, setValue] = useState(() => serializeGame(state))
+  const [message, setMessage] = useState('Your game saves automatically. Copy a backup, or paste a save to restore it.')
+  return <Modal title="Export / import lab" eyebrow="LOCAL SAVE" close={close}><p role="status">{message}</p>
+    <textarea aria-label="Save data" value={value} onChange={e => setValue(e.target.value)} spellCheck={false}/>
+    <div className="dialog-actions"><button onClick={async () => { try { await navigator.clipboard.writeText(serializeGame(state)); setMessage('Save copied to clipboard.') } catch { setMessage('Clipboard unavailable. Select the save text and copy it manually.'); setValue(serializeGame(state)) } }}>Copy current save</button>
+    <button className="primary" onClick={() => { const parsed = loadGame(value); if (parsed) { onImport(parsed); close() } else setMessage('That save is invalid or incompatible. Your current game is unchanged.') }}>Import pasted save</button></div>
+  </Modal>
 }
 
-const tutorialContent = [
-  { eyebrow: 'ORIENTATION 1/4', title: 'Watch the traffic', text: 'Let 20 requests travel through the office server. Every successful response earns revenue.' },
-  { eyebrow: 'ORIENTATION 2/4', title: 'Fix the red bottleneck', text: 'CPU capacity is below demand. Install the CPU Module from the upgrade console.' },
-  { eyebrow: 'ORIENTATION 3/4', title: 'Read the diagnostics', text: 'Upgrading one stage can expose the next constraint. Inspect the stage meters below.' },
-  { eyebrow: 'ORIENTATION 4/4', title: 'Add working memory', text: 'Install the Memory Bank, then the lab is yours to grow and experiment with.' },
-]
-
-function ObjectiveCard({ state, onInspect }: { state: GameState; onInspect: () => void }) {
-  if (state.tutorialComplete) {
-    const next = UPGRADES.find((upgrade) => !state.upgrades.includes(upgrade.id))
-    return <section className="objective-card complete-card">
-      <div className="eyebrow">OPEN LAB</div>
-      <h2>{state.completed ? 'Endless Lab online' : next ? `Next capability: ${next.name}` : 'Architecture complete'}</h2>
-      <p>{state.completed ? 'Keep tuning policies and testing the architecture against rising demand.' : next?.lesson ?? 'Prepare the AI service for Launch Day.'}</p>
-      <div className="objective-progress"><i style={{ width: `${state.upgrades.length / 12 * 100}%` }} /></div>
-      <small>{state.upgrades.length} / 12 technologies installed</small>
-    </section>
-  }
-  const content = tutorialContent[state.tutorialStep] ?? tutorialContent[3]
-  const progress = state.tutorialStep === 0 ? Math.min(100, state.totalServed / 20 * 100) : 100
-  return <section className="objective-card">
-    <div className="eyebrow">{content.eyebrow}</div>
-    <h2>{content.title}</h2>
-    <p>{content.text}</p>
-    {state.tutorialStep === 0 && <><div className="objective-progress"><i style={{ width: `${progress}%` }} /></div><small>{Math.min(20, Math.floor(state.totalServed))} / 20 served</small></>}
-    {state.tutorialStep === 2 && <button className="primary small" onClick={onInspect}>Inspect diagnostics <span>→</span></button>}
-  </section>
+function Stat({ label, value, tone = '', hint }: { label: string; value: string; tone?: string; hint?: string }) {
+  return <div className={'stat ' + tone} title={hint}><span>{label}</span><strong>{value}</strong></div>
 }
 
-type NodeProps = { x: number; y: number; title: string; code: string; active?: boolean; warning?: boolean; locked?: boolean; onClick: () => void; variant?: string }
-function MapNode({ x, y, title, code, active = true, warning, locked, onClick, variant = '' }: NodeProps) {
-  const keyDown = (event: React.KeyboardEvent<SVGGElement>) => {
-    if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onClick() }
-  }
-  return <g className={`map-node ${active ? 'active' : ''} ${warning ? 'warning' : ''} ${locked ? 'locked' : ''} ${variant}`} transform={`translate(${x} ${y})`} role="button" tabIndex={0} aria-label={`${title}${locked ? ', locked' : ''}`} onClick={onClick} onKeyDown={keyDown}>
-    <rect className="node-shadow" x="5" y="6" width="122" height="78" rx="4" />
-    <rect className="node-body" width="122" height="78" rx="4" />
-    <rect className="node-top" x="8" y="9" width="106" height="36" rx="2" />
-    <text className="node-code" x="61" y="33" textAnchor="middle">{locked ? '???' : code}</text>
-    <circle className="node-light" cx="16" cy="62" r="4" />
-    <rect className="node-slot" x="27" y="58" width="53" height="7" rx="2" />
-    <text className="node-title" x="61" y="99" textAnchor="middle">{title}</text>
-    {warning && <g className="warn-badge" transform="translate(105 -8)"><path d="M0 19 11 0l11 19Z"/><text x="11" y="15" textAnchor="middle">!</text></g>}
-  </g>
-}
-
-function InfrastructureMap({ state, selected, setSelected }: { state: GameState; selected: string; setSelected: (value: string) => void }) {
-  const has = (id: UpgradeId) => state.upgrades.includes(id)
-  const bottleneck = state.metrics.bottleneck
-  const packetClass = state.metrics.successRate < .85 ? 'packet packet-warn' : 'packet'
-  return <section className="map-shell" aria-label="Infrastructure map">
-    <header className="panel-heading">
-      <div><span className="eyebrow">LIVE ARCHITECTURE</span><h2>Request flow</h2></div>
-      <div className={`health-pill ${state.metrics.successRate >= .98 ? 'healthy' : 'strained'}`}><i />{state.metrics.successRate >= .98 ? 'ALL SYSTEMS NOMINAL' : 'CAPACITY STRAIN'}</div>
-    </header>
-    <div className="map-stage">
-      <div className="map-grid" />
-      <svg viewBox="0 0 1030 520" role="img" aria-label="Customer requests flowing through the CloudLab infrastructure">
-        <defs>
-          <filter id="glow"><feGaussianBlur stdDeviation="3" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
-          <linearGradient id="cloudGlow" x1="0" x2="1"><stop stopColor="#44d9c5"/><stop offset="1" stopColor="#6e8dff"/></linearGradient>
-        </defs>
-        <path className="flow-line active-line" d="M128 267H204" />
-        <path className={`flow-line ${has('cache') ? 'active-line' : ''}`} d="M326 267H380" />
-        <path className={`flow-line ${has('load_balancer') ? 'active-line' : ''}`} d="M502 267H558" />
-        <path className="flow-line active-line" d="M680 267H752" />
-        <path className="flow-line active-line" d="M874 267H940" />
-        <path className={`flow-line cloud-line ${has('cloud') ? 'active-line' : ''}`} d="M619 223V132H752" />
-        <path className={`flow-line cloud-line ${has('ai') ? 'active-line' : ''}`} d="M874 90H940" />
-        <path className={`flow-line ${has('server2') ? 'active-line' : ''}`} d="M619 311v78h133" />
-
-        <g className={state.paused ? 'packets paused' : 'packets'} aria-hidden="true">
-          {[0, .7, 1.4].map((delay) => <circle key={`a${delay}`} className={packetClass} r="5"><animateMotion dur="2.2s" begin={`${delay}s`} repeatCount="indefinite" path="M128 267H940" /></circle>)}
-          {has('cloud') && <circle className="packet packet-cloud" r="5"><animateMotion dur="2.7s" repeatCount="indefinite" path="M502 267H619V90H940" /></circle>}
-        </g>
-
-        <g className="internet-node" transform="translate(35 222)">
-          <circle cx="46" cy="44" r="42"/><path d="M10 44h72M46 4c17 18 17 62 0 80M46 4c-17 18-17 62 0 80M16 22h60M16 66h60"/>
-          <text x="46" y="106" textAnchor="middle">CUSTOMERS</text>
-        </g>
-
-        <MapNode x={204} y={228} title="Gateway" code="NET" warning={bottleneck === 'network'} onClick={() => setSelected('gateway')} />
-        <MapNode x={380} y={228} title="Edge cache" code="CDN" active={has('cache')} locked={!has('cache')} onClick={() => setSelected('cache')} />
-        <MapNode x={558} y={228} title="Load balancer" code="LB" active={has('load_balancer')} locked={!has('load_balancer')} onClick={() => setSelected('load_balancer')} />
-        <MapNode x={752} y={228} title="Office server" code="SRV-1" warning={['compute','memory'].includes(bottleneck)} onClick={() => setSelected('server')} />
-        <MapNode x={752} y={350} title="Second server" code="SRV-2" active={has('server2')} locked={!has('server2')} onClick={() => setSelected('server2')} />
-        <MapNode x={940} y={228} title="Storage" code="DATA" warning={bottleneck === 'storage'} onClick={() => setSelected('storage')} />
-        <MapNode x={752} y={50} title="Cloud compute" code="CLD" active={has('cloud')} locked={!has('cloud')} onClick={() => setSelected('cloud')} variant="cloud-node" />
-        <MapNode x={940} y={50} title="AI inference" code="GPU" active={has('ai')} locked={!has('ai')} warning={bottleneck === 'ai'} onClick={() => setSelected('ai')} variant="ai-node" />
-      </svg>
-      <div className="map-legend"><span><i className="legend-live"/>request</span><span><i className="legend-cloud"/>cloud route</span><span><i className="legend-warn"/>bottleneck</span></div>
-      <div className="selected-readout">SELECTED // <strong>{selected.replace('_', ' ').toUpperCase()}</strong></div>
-    </div>
-  </section>
-}
-
-function CapacityBar({ label, value, utilization, warning }: { label: string; value: string; utilization: number; warning?: boolean }) {
-  return <div className={`capacity-row ${warning ? 'hot' : ''}`}>
-    <div><span>{label}</span><strong>{value}</strong></div>
-    <div className="capacity-track"><i style={{ width: `${Math.max(3, utilization * 100)}%` }} /></div>
-    <small>{Math.round(utilization * 100)}%</small>
-  </div>
-}
-
-function Diagnostics({ metrics }: { metrics: Metrics }) {
-  const bottleneckLabel = metrics.bottleneck === 'compute' ? 'CPU' : metrics.bottleneck.toUpperCase()
-  return <section className="diagnostics panel">
-    <header className="panel-heading compact"><div><span className="eyebrow">DIAGNOSTICS</span><h2>Capacity stages</h2></div><span className={`bottleneck-tag ${metrics.bottleneck === 'healthy' ? 'ok' : ''}`}>{metrics.bottleneck === 'healthy' ? 'BALANCED' : `${bottleneckLabel} LIMITED`}</span></header>
-    <div className="capacity-list">
-      <CapacityBar label="NETWORK" value={`${num(metrics.network)} req/m`} utilization={metrics.utilizations.network} warning={metrics.bottleneck === 'network'} />
-      <CapacityBar label="CPU" value={`${num(metrics.compute)} req/m`} utilization={metrics.utilizations.compute} warning={metrics.bottleneck === 'compute'} />
-      <CapacityBar label="MEMORY" value={`${num(metrics.memory)} req/m`} utilization={metrics.utilizations.memory} warning={metrics.bottleneck === 'memory'} />
-      <CapacityBar label="STORAGE" value={`${num(metrics.storage)} req/m`} utilization={metrics.utilizations.storage} warning={metrics.bottleneck === 'storage'} />
-      {metrics.aiCapacity > 0 && <CapacityBar label="AI / GPU" value={`${num(metrics.aiCapacity)} req/m`} utilization={metrics.utilizations.ai} warning={metrics.bottleneck === 'ai'} />}
-    </div>
-  </section>
-}
-
-function UpgradePanel({ state, onBuy }: { state: GameState; onBuy: (id: UpgradeId) => void }) {
-  const [category, setCategory] = useState<'all' | 'hardware' | 'reliability' | 'cloud' | 'advanced'>('all')
-  const list = category === 'all' ? UPGRADES : UPGRADES.filter((item) => item.category === category)
-  return <section className="upgrade-panel panel">
-    <header className="panel-heading"><div><span className="eyebrow">PROCUREMENT</span><h2>Upgrade console</h2></div><span className="upgrade-count">{state.upgrades.length}/12</span></header>
-    <div className="filter-tabs" role="tablist" aria-label="Upgrade categories">
-      {(['all','hardware','reliability','cloud','advanced'] as const).map((value) => <button key={value} className={category === value ? 'active' : ''} onClick={() => setCategory(value)}>{value === 'reliability' ? 'SAFE' : value.slice(0,4).toUpperCase()}</button>)}
-    </div>
+function UpgradePanel({ state, buy, focusId }: { state: GameState; buy: (id: UpgradeId) => void; focusId?: string }) {
+  const guided = state.tutorial.status === 'active' || state.tutorial.status === 'welcome'
+  const lesson = getTutorialLesson(state)
+  const [category, setCategory] = useState('all')
+  const list = guided ? UPGRADES.filter(x => getEffectiveUpgrades(state).includes(x.id) || x.id === lesson.requiredUpgrade)
+    : UPGRADES.filter(x => category === 'all' || x.category === category)
+  useEffect(() => {
+    if (focusId && !guided) setCategory('all')
+    const timer = window.setTimeout(() => { if (focusId) document.getElementById('upgrade-' + focusId)?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }) }, 30)
+    return () => clearTimeout(timer)
+  }, [focusId, guided])
+  return <section className="upgrade-panel panel" aria-label="Upgrade console">
+    <header className="panel-heading"><div><span className="eyebrow">{guided ? 'YOUR TRAINING WORKBENCH' : 'PROCUREMENT'}</span><h2>Upgrade console</h2></div><span className="upgrade-count">{state.upgrades.length}/12</span></header>
+    {!guided && <div className="filter-tabs" aria-label="Upgrade categories">{['all','hardware','reliability','cloud','advanced'].map(c => <button key={c} aria-pressed={category === c} className={category === c ? 'active' : ''} onClick={() => setCategory(c)}>{c === 'reliability' ? 'SAFETY' : c.toUpperCase()}</button>)}</div>}
     <div className="upgrade-list">
-      {list.map((item) => {
-        const installed = state.upgrades.includes(item.id)
-        const missing = item.prerequisites.filter((id) => !state.upgrades.includes(id))
-        const affordable = state.cash >= item.cost
-        const enabled = !installed && missing.length === 0 && affordable
-        const reason = installed ? 'INSTALLED' : missing.length ? `LOCKED · ${missing.map((id) => upgradeById[id].name).join(' + ')}` : affordable ? 'READY TO INSTALL' : `${money(item.cost - state.cash)} NEEDED`
-        return <article className={`upgrade-card ${installed ? 'installed' : ''} ${enabled ? 'ready' : ''}`} key={item.id}>
-          <div className="upgrade-icon">{installed ? '✓' : item.icon}</div>
-          <div className="upgrade-copy"><div className="upgrade-title"><h3>{item.name}</h3><strong>{installed ? 'OWNED' : money(item.cost)}</strong></div><p>{item.short}</p><small>{item.effect}</small><div className="lesson">{item.lesson}</div></div>
-          <button disabled={!enabled} onClick={() => onBuy(item.id)} aria-label={`Purchase ${item.name}`}>{reason}</button>
+      {list.length === 0 && <div className="empty-state"><span>◇</span><p>First, follow your guide. Your first upgrade appears when you learn what it fixes.</p></div>}
+      {list.map(item => {
+        const installed = state.upgrades.includes(item.id), permission = canPurchase(state, item.id)
+        const required = guided && lesson.requiredUpgrade === item.id
+        const waiting = !installed && item.cost > state.cash && state.metrics.net > 0
+        const wait = Math.ceil((item.cost - state.cash) / (state.metrics.net * state.speed))
+        return <article id={'upgrade-' + item.id} data-upgrade-id={item.id} key={item.id} className={'upgrade-card ' + (installed ? 'installed ' : permission.ok ? 'ready ' : '') + (required || focusId === item.id ? ' upgrade-target' : '')}>
+          <div className="upgrade-icon">{installed ? '✓' : item.icon}</div><div className="upgrade-copy">
+            <div className="upgrade-title"><h3>{item.name}</h3><strong>{installed ? 'OWNED' : money(item.cost)}</strong></div><p>{item.short}</p><small>{item.effect}</small>
+            <details><summary>Why this helps</summary><p>{item.lesson}</p></details>
+          </div>
+          <button disabled={!permission.ok} onClick={() => buy(item.id)} aria-label={'Purchase ' + item.name}>{installed ? 'INSTALLED' : permission.ok ? 'INSTALL · ' + money(item.cost) : permission.reason}</button>
+          {waiting && !guided && <small className="wait-estimate">About {wait < 60 ? wait + ' seconds' : Math.ceil(wait / 60) + ' minutes'} at {state.speed}×, if income stays steady.</small>}
         </article>
       })}
+      {guided && <div className="future-milestones"><strong>LATER IN YOUR LAB</strong><p>More servers → load balancing → security → cloud → AI</p><small>Unlocked after orientation. One concept at a time.</small></div>}
     </div>
   </section>
 }
 
-function PolicySelect<T extends string>({ label, value, options, disabled, onChange }: { label: string; value: T; options: {value:T; label:string; help:string}[]; disabled: boolean; onChange: (value:T) => void }) {
-  return <div className="policy-block"><label>{label}</label><div className="segmented">{options.map((option) => <button key={option.value} className={value === option.value ? 'active' : ''} disabled={disabled} onClick={() => onChange(option.value)} title={option.help}>{option.label}</button>)}</div><p>{options.find((x) => x.value === value)?.help}</p></div>
-}
-
-function Operations({ state, onPolicy, onChallenge }: { state: GameState; onPolicy: (group: keyof PolicyState, value: string) => void; onChallenge: () => void }) {
-  const cooldown = Math.max(0, Math.ceil(state.policyCooldownUntil - state.elapsed))
-  const has = (id: UpgradeId) => state.upgrades.includes(id)
-  return <section className="operations panel">
-    <header className="panel-heading compact"><div><span className="eyebrow">OPERATIONS</span><h2>Runtime policies</h2></div>{cooldown > 0 && <span className="cooldown">SYNC {cooldown}s</span>}</header>
-    {!has('load_balancer') && <div className="empty-state"><span>◈</span><p>Install a load balancer to unlock live operating policies.</p></div>}
-    {has('load_balancer') && <PolicySelect label="TRAFFIC" value={state.policies.loadBalancer} disabled={cooldown > 0} onChange={(v) => onPolicy('loadBalancer', v)} options={[{value:'efficiency',label:'EFFICIENCY',help:'+10% capacity; greater outage impact.'},{value:'redundancy',label:'REDUNDANCY',help:'−10% capacity; hardware faults hurt less.'}]} />}
-    {has('security') && <PolicySelect label="FIREWALL" value={state.policies.firewall} disabled={cooldown > 0} onChange={(v) => onPolicy('firewall', v)} options={[{value:'balanced',label:'BALANCED',help:'Strong protection without a compute penalty.'},{value:'strict',label:'STRICT',help:'Maximum protection; uses 8% on-prem compute.'}]} />}
-    {has('autoscaling') && <PolicySelect label="AUTOSCALING" value={state.policies.autoscaling} disabled={cooldown > 0} onChange={(v) => onPolicy('autoscaling', v)} options={[{value:'economy',label:'ECONOMY',help:'Runs hotter to keep the cloud bill low.'},{value:'resilient',label:'RESILIENT',help:'Keeps extra headroom for sudden demand.'}]} />}
-    {has('ai') && <div className={`challenge-card ${state.completed ? 'passed' : ''}`}><span className="eyebrow">FINAL VALIDATION</span><h3>{state.completed ? 'Launch Day passed' : 'Launch Day'}</h3><p>{state.completed ? 'Endless Lab is active. Demand and incidents will continue.' : '90-minute peak: serve 90% of traffic and finish with 65 reputation.'}</p>{!state.completed && <button className="primary" onClick={onChallenge} disabled={state.challenge.active || state.elapsed < state.challenge.retryAt}>{state.challenge.active ? `${Math.ceil(state.challenge.remaining)}m remaining` : state.elapsed < state.challenge.retryAt ? `Retry in ${Math.ceil(state.challenge.retryAt-state.elapsed)}m` : 'Start Launch Day'}</button>}{state.challenge.result === 'failed' && <small>Last attempt missed the target. Review diagnostics and retry.</small>}</div>}
+function Diagnostics({ state, highlight }: { state: GameState; highlight: boolean }) {
+  const m = state.metrics
+  return <section id="diagnostics" className={'diagnostics panel' + (highlight ? ' tutorial-highlight' : '')}>
+    <header className="panel-heading compact"><div><span className="eyebrow">FIND THE LIMIT</span><h2>Capacity stages</h2></div><span className={'bottleneck-tag ' + (m.bottleneck === 'healthy' ? 'ok' : '')}>{m.bottleneck === 'healthy' ? 'BALANCED' : stageName(m.bottleneck).toUpperCase() + ' LIMITED'}</span></header>
+    <p className="diagnostic-help">Requests can only move as fast as the slowest required stage. A full meter means that stage has little spare capacity.</p>
+    <div className="capacity-list">{(['network','compute','memory','storage','ai'] as const).filter(k => k !== 'ai' || m.aiCapacity > 0).map(k => {
+      const cap = k === 'ai' ? m.aiCapacity : m[k]
+      return <div key={k} className={'capacity-row ' + (m.bottleneck === k ? 'hot' : '')}><div><span>{stageName(k).toUpperCase()}</span><strong>{num(cap)} req/m</strong></div><div className="capacity-track"><i style={{ width: Math.max(2, m.utilizations[k] * 100) + '%' }}/></div><small>{Math.round(m.utilizations[k]*100)}%</small></div>
+    })}</div><div className="request-summary"><span>✓ Served: <strong>{num(m.served)}/min</strong></span><span>! Dropped: <strong>{num(m.dropped)}/min</strong></span></div>
   </section>
 }
 
-function EventLog({ state }: { state: GameState }) {
-  return <section className="event-log panel"><header className="panel-heading compact"><div><span className="eyebrow">SYSTEM LOG</span><h2>Recent events</h2></div><span className="live-dot">LIVE</span></header><div className="log-list">{state.logs.map((entry) => <div className={entry.tone} key={entry.id}><time>D{Math.floor(entry.time/24)+1}:{String(Math.floor(entry.time%24)).padStart(2,'0')}</time><p>{entry.text}</p></div>)}</div></section>
+function Operations({ state, policy, challenge }: { state: GameState; policy: (key: keyof PolicyState, value: string) => void; challenge: () => void }) {
+  const has = (id: UpgradeId) => state.upgrades.includes(id), cooldown = Math.ceil(Math.max(0,state.policyCooldownUntil-state.elapsed))
+  const readiness = getChallengeReadiness(state)
+  return <section className="operations panel"><header className="panel-heading compact"><div><span className="eyebrow">OPERATIONS</span><h2>Runtime policies</h2></div>{cooldown > 0 && <span className="cooldown">SYNC {cooldown}m</span>}</header>
+    {!has('load_balancer') && <div className="empty-state"><p>Load balancing unlocks your first operating choice. Start by improving the office server.</p></div>}
+    {([
+      ['loadBalancer','load_balancer','TRAFFIC',['efficiency','redundancy'],'Efficiency gives more capacity. Redundancy reduces the impact of hardware faults.'],
+      ['firewall','security','FIREWALL',['balanced','strict'],'Strict blocks more malicious traffic, but uses 8% of on-premise compute.'],
+      ['autoscaling','autoscaling','AUTOSCALING',['economy','resilient'],'Economy reacts in 10 game minutes. Resilient reacts in 3 and pays for extra headroom.'],
+    ] as const).filter(([,id]) => has(id)).map(([key,,label,options,explanation]) => <div className="policy-block" key={key}><label>{label}</label><div className="segmented">{options.map(v => <button key={v} aria-label={label + ' ' + v} aria-pressed={state.policies[key] === v} className={state.policies[key] === v ? 'active' : ''} disabled={cooldown > 0} onClick={() => policy(key,v)}>{v.toUpperCase()}</button>)}</div><p>{explanation}</p></div>)}
+    {has('ai') && <div className={'challenge-card ' + (state.completed ? 'passed' : '')}><span className="eyebrow">FINAL VALIDATION</span><h3>{state.completed ? 'Launch Day passed' : 'Launch Day'}</h3><p>{state.completed ? 'Endless Lab is active. Keep experimenting.' : 'Serve at least 90% of peak traffic over 90 game minutes, and finish with reputation 65+.'}</p>
+      {!state.challenge.active && !state.completed && <><p className="readiness">{readiness.ready ? '✓ Architecture ready for the launch test.' : readiness.reasons.join(' ')}</p><button className="primary" onClick={challenge} disabled={state.elapsed < state.challenge.retryAt}>{state.elapsed < state.challenge.retryAt ? 'Retry in ' + Math.ceil(state.challenge.retryAt-state.elapsed) + 'm' : 'Start Launch Day'}</button></>}
+      {state.challenge.result === 'failed' && <p>Last launch missed the target. Review your priority card, warm up capacity, then retry.</p>}
+    </div>}
+  </section>
 }
 
-function SaveDialog({ state, onClose, onImport }: { state: GameState; onClose: () => void; onImport: (state: GameState) => void }) {
-  const [value, setValue] = useState(() => serializeGame(state))
-  const [message, setMessage] = useState('Paste a save here to import, or copy the current snapshot.')
-  const copy = async () => { await navigator.clipboard.writeText(serializeGame(state)); setMessage('Save copied to clipboard.') }
-  const load = () => { const parsed = loadGame(value); if (parsed) { onImport(parsed); onClose() } else setMessage('That save is invalid or incompatible.') }
-  return <div className="modal-backdrop" role="presentation" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose() }}><section className="save-dialog" role="dialog" aria-modal="true" aria-labelledby="save-title"><header><div><span className="eyebrow">LOCAL SAVE</span><h2 id="save-title">Export / import lab</h2></div><button className="icon-button" onClick={onClose} aria-label="Close">×</button></header><p>{message}</p><textarea value={value} onChange={(e) => setValue(e.target.value)} spellCheck={false} aria-label="Save data"/><div className="dialog-actions"><button onClick={copy}>Copy current save</button><button className="primary" onClick={load}>Import pasted save</button></div></section></div>
-}
-
-function App() {
-  const { state, setState } = useGame()
-  const [selected, setSelected] = useState('server')
-  const [saveOpen, setSaveOpen] = useState(false)
-  const [muted, setMuted] = useState(true)
-  const [reducedMotion, setReducedMotion] = useState(false)
-
-  const beep = useCallback((frequency = 520) => {
+export default function App() {
+  const [saveOpen, setSaveOpen] = useState(false), [helpOpen, setHelpOpen] = useState(false)
+  const [pendingBuy, setPendingBuy] = useState<UpgradeId | null>(null)
+  const { state, setState, notice } = useGame(saveOpen || helpOpen || !!pendingBuy)
+  const [selected, setSelected] = useState('server'), [focusId, setFocusId] = useState<string>()
+  const [muted, setMuted] = useState(true), [reducedMotion, setReducedMotion] = useState(false)
+  const [hint, setHint] = useState<{ id: string; title: string; reason: string } | null>(null)
+  const [dismissed, setDismissed] = useState<string[]>([])
+  const hintCandidate = useRef({ id: '', since: 0 })
+  const audio = useRef<AudioContext | null>(null)
+  const guided = state.tutorial.status === 'active', welcome = state.tutorial.status === 'welcome'
+  const lesson = getTutorialLesson(state), recommendation = getRecommendation(state)
+  useEffect(() => {
+    if (guided) {
+      window.scrollTo({ top: 0, behavior: 'instant' })
+      const target = lesson.target === 'cpu' || lesson.target === 'memory' ? 'server' : lesson.target === 'ssd' ? 'storage' : lesson.target
+      if (['server','gateway','storage'].includes(target)) setSelected(target)
+    }
+  }, [guided, state.tutorial.step, state.tutorial.phase, lesson.target])
+  useEffect(() => {
+    if (guided || welcome) return
+    if (hintCandidate.current.id !== recommendation.id) hintCandidate.current = { id: recommendation.id, since: state.elapsed }
+    if (state.metrics.successRate < .95 && state.elapsed - hintCandidate.current.since >= 6 && !dismissed.includes(recommendation.id)) {
+      setHint({ id: recommendation.id, title: recommendation.title, reason: recommendation.reason })
+    } else if (state.metrics.successRate >= .98) setHint(null)
+  }, [recommendation.id, recommendation.title, recommendation.reason, state.elapsed, state.metrics.successRate, guided, welcome, dismissed])
+  useEffect(() => () => { void audio.current?.close() }, [])
+  const beep = () => {
     if (muted) return
-    const AudioContextClass = window.AudioContext || (window as typeof window & { webkitAudioContext: typeof AudioContext }).webkitAudioContext
-    const context = new AudioContextClass(); const osc = context.createOscillator(); const gain = context.createGain()
-    osc.type = 'square'; osc.frequency.value = frequency; gain.gain.setValueAtTime(.035, context.currentTime); gain.gain.exponentialRampToValueAtTime(.001, context.currentTime + .09)
-    osc.connect(gain); gain.connect(context.destination); osc.start(); osc.stop(context.currentTime + .1)
-  }, [muted])
+    try {
+      const ctx = audio.current ??= new AudioContext()
+      void ctx.resume()
+      const oscillator = ctx.createOscillator(), gain = ctx.createGain()
+      oscillator.type = 'square'; oscillator.frequency.value = 660; gain.gain.setValueAtTime(.025,ctx.currentTime); gain.gain.exponentialRampToValueAtTime(.001,ctx.currentTime+.12)
+      oscillator.connect(gain); gain.connect(ctx.destination); oscillator.start(); oscillator.stop(ctx.currentTime+.13)
+    } catch { setMuted(true) }
+  }
+  const confirmBuy = (id: UpgradeId) => { setState(s => purchaseUpgrade(s,id)); setPendingBuy(null); beep() }
+  const buy = (id: UpgradeId) => { if (!guided && getPurchaseAdvice(state,id)) setPendingBuy(id); else confirmBuy(id) }
+  const viewRecommendation = () => {
+    setPendingBuy(null)
+    if (recommendation.upgradeId) setFocusId(recommendation.upgradeId)
+    window.setTimeout(() => {
+      document.getElementById(recommendation.upgradeId ? 'upgrade-' + recommendation.upgradeId : 'upgrade-console')?.scrollIntoView({block:'nearest', behavior:'smooth'})
+    }, 50)
+  }
+  const closeSave = useCallback(() => setSaveOpen(false), [])
+  const closeHelp = useCallback(() => setHelpOpen(false), [])
+  const closeBuy = useCallback(() => setPendingBuy(null), [])
+  const reset = () => { if (window.confirm('Reset CloudLab? Export a save first if you want to keep this lab.')) { setState(createInitialState()); setHint(null); setDismissed([]) } }
+  const dismissHint = () => { if(hint) setDismissed(x => [...x,hint.id]); setHint(null) }
+  const minutes = Math.floor(state.elapsed), rate = state.challenge.totalDemand ? state.challenge.totalServed/state.challenge.totalDemand : 1
 
-  const buy = (id: UpgradeId) => setState((current) => { const next = purchaseUpgrade(current, id); if (next !== current) beep(700); return next })
-  const reset = () => { if (window.confirm('Reset CloudLab? This permanently replaces your local progress.')) { localStorage.removeItem(SAVE_KEY); setState(createInitialState()) } }
-  const challengeRate = state.challenge.totalDemand ? state.challenge.totalServed / state.challenge.totalDemand : 1
-  const incidentProgress = state.incident ? 1 - state.incident.remaining / state.incident.total : 0
-  const topTone = state.metrics.net >= 0 ? 'positive' : 'negative'
-  const accessibleStatus = useMemo(() => `${Math.round(state.metrics.successRate*100)} percent of requests served. ${state.metrics.bottleneck === 'healthy' ? 'No bottleneck' : `${state.metrics.bottleneck === 'compute' ? 'CPU' : state.metrics.bottleneck} is the current bottleneck`}.`, [state.metrics])
-
-  return <div className={`app ${reducedMotion ? 'reduce-motion' : ''}`}>
+  return <div className={'app ' + (guided ? 'tutorial-layout ' : '') + (reducedMotion ? 'reduce-motion' : '')}>
     <a className="skip-link" href="#upgrade-console">Skip to upgrades</a>
-    <header className="topbar">
-      <div className="brand"><div className="brand-mark"><i/><i/><i/><i/></div><div><h1>CLOUD<span>LAB</span></h1><small>INFRASTRUCTURE TYCOON</small></div></div>
-      <div className="status-strip" aria-live="polite">
-        <Stat label="CASH" value={money(state.cash)} tone="cash" />
-        <Stat label="DEMAND" value={`${num(state.metrics.demand)}/m`} hint="Incoming customer requests per in-game minute" />
-        <Stat label="SERVED" value={`${Math.round(state.metrics.successRate*100)}%`} tone={state.metrics.successRate >= .98 ? 'positive' : 'warning'} />
-        <Stat label="LATENCY" value={`${Math.round(state.metrics.latency)}ms`} tone={state.metrics.latency > 400 ? 'warning' : ''} />
-        <Stat label="NET INCOME" value={`${state.metrics.net >= 0 ? '+' : ''}${money(state.metrics.net)}/m`} tone={topTone} />
-        <Stat label="REPUTATION" value={`${Math.round(state.reputation)}`} tone={state.reputation >= 65 ? 'positive' : ''} />
-      </div>
-      <div className="clock-block"><span>{clock(state.elapsed)}</span><strong>{state.paused ? 'PAUSED' : `${state.speed}× SPEED`}</strong></div>
-    </header>
-
-    <main>
-      <aside className="left-column">
-        <ObjectiveCard state={state} onInspect={() => setState(inspectDiagnostics)} />
-        {state.incident && <section className="incident-card" aria-live="assertive"><div className="incident-head"><span>⚠ ACTIVE INCIDENT</span><strong>{Math.ceil(state.incident.remaining)}m</strong></div><h2>{state.incident.title}</h2><p>{state.incident.detail}</p><div className="incident-track"><i style={{width:`${incidentProgress*100}%`}}/></div><small>{state.incident.kind === 'hardware' ? 'Recovery and redundancy reduce outage duration.' : state.incident.kind === 'bot' ? 'Firewall policy reduces attack impact.' : state.incident.kind === 'billing' ? 'Watch net income and autoscaling policy.' : 'Capacity upgrades and caching absorb spikes.'}</small></section>}
-        {state.challenge.active && <section className="incident-card challenge-live"><div className="incident-head"><span>◆ LAUNCH DAY</span><strong>{Math.ceil(state.challenge.remaining)}m</strong></div><h2>Service target: 90%</h2><div className="challenge-number">{Math.round(challengeRate*100)}<small>% served</small></div><div className="incident-track"><i style={{width:`${Math.min(100, challengeRate*100)}%`}}/></div><p>Finish with reputation 65+. Current: {Math.round(state.reputation)}</p></section>}
-        <Operations state={state} onPolicy={(group, value) => setState((s) => setPolicy(s, group, value))} onChallenge={() => setState(startChallenge)} />
-        <EventLog state={state} />
-      </aside>
-
-      <div className="center-column">
-        <div className="sr-only" aria-live="polite">{accessibleStatus}</div>
-        <InfrastructureMap state={state} selected={selected} setSelected={setSelected} />
-        <Diagnostics metrics={state.metrics} />
-        <section className="economy-panel panel"><header><span>ECONOMY FLOW</span><small>per game minute</small></header><div className="economy-flow"><div><span>SUCCESSFUL REQUESTS</span><strong>{num(state.metrics.served)}</strong></div><b>×</b><div><span>REVENUE</span><strong>{money(state.metrics.gross)}</strong></div><b>−</b><div><span>OPERATING COST</span><strong>{money(state.metrics.expenses)}</strong></div><b>=</b><div className={state.metrics.net >= 0 ? 'profit' : 'loss'}><span>NET INCOME</span><strong>{state.metrics.net >= 0 ? '+' : ''}{money(state.metrics.net)}</strong></div></div>{state.metrics.cacheHits > 0 && <footer>Edge cache served <strong>{num(state.metrics.cacheHits)}</strong> requests without origin compute.</footer>}</section>
-      </div>
-
-      <aside className="right-column" id="upgrade-console"><UpgradePanel state={state} onBuy={buy} /></aside>
-    </main>
-
-    <footer className="controlbar">
-      <div className="sim-controls"><button className={state.paused ? 'active' : ''} onClick={() => setState(togglePause)}>{state.paused ? '▶ RESUME' : 'Ⅱ PAUSE'}</button>{([1,2,4] as const).map((speed) => <button key={speed} className={state.speed === speed ? 'active' : ''} onClick={() => setState((s) => setSpeed(s, speed))}>{speed}×</button>)}</div>
-      <div className="ticker"><span>LIVE</span><p>{state.logs[0]?.text}</p></div>
-      <div className="utility-controls"><button onClick={() => setReducedMotion((x) => !x)} className={reducedMotion ? 'active' : ''} title="Toggle reduced motion">MOTION {reducedMotion ? 'OFF' : 'ON'}</button><button onClick={() => setMuted((x) => !x)} title="Toggle sound">{muted ? 'SOUND OFF' : 'SOUND ON'}</button><button onClick={() => setSaveOpen(true)}>SAVE</button><button onClick={reset}>RESET</button></div>
-    </footer>
-    {saveOpen && <SaveDialog state={state} onClose={() => setSaveOpen(false)} onImport={setState} />}
+    <div className="game-surface" inert={welcome || saveOpen || helpOpen || !!pendingBuy}>
+      <header className="topbar"><div className="brand"><div className="brand-mark"><i/><i/><i/><i/></div><div><h1>CLOUD<span>LAB</span></h1><small>BUILD · LEARN · SCALE</small></div></div>
+        <div className="status-strip">
+          <Stat label="CASH" value={money(state.cash)} tone="cash"/>
+          <Stat label="DEMAND" value={num(state.metrics.demand)+'/m'} hint="Requests arriving each game minute"/>
+          <Stat label="SERVED" value={Math.round(state.metrics.successRate*100)+'%'} tone={state.metrics.successRate >= .98 ? 'positive' : 'warning'}/>
+          <Stat label="LATENCY" value={Math.round(state.metrics.latency)+'ms'} hint="How long customers wait for a response"/>
+          <Stat label="NET INCOME" value={(state.metrics.net >= 0 ? '+' : '')+money(state.metrics.net)+'/m'} tone={state.metrics.net >= 0 ? 'positive' : 'negative'}/>
+          <Stat label="REPUTATION" value={Math.round(state.reputation)+'/100'}/>
+        </div><div className="clock-block"><span>DAY {Math.floor(minutes/1440)+1} · {String(Math.floor(minutes/60)%24).padStart(2,'0')}:{String(minutes%60).padStart(2,'0')}</span><strong>{state.paused ? 'PAUSED' : state.speed+'× SPEED'}</strong></div>
+      </header>
+      {notice && <div className="storage-notice" role="status">{notice}</div>}
+      {guided && <section className="tutorial-banner" data-testid="tutorial-banner" data-step={state.tutorial.step} data-phase={state.tutorial.phase} aria-label="Guided tutorial">
+        <div><span className="eyebrow">LESSON {state.tutorial.step+1} / 8 · {state.tutorial.phase === 'demo' ? 'LIVE DEMONSTRATION' : 'TAKE YOUR TIME'}</span><h2 className="lesson-title">{lesson.title}</h2><p>{lesson.body}</p>{state.tutorial.replay && <small>Training preview: your real upgrades and money are preserved. Return to your live lab when you finish or skip.</small>}</div>
+        <div className="lesson-actions">{state.tutorial.phase === 'demo' ? <span role="status">Observing… {Math.ceil(state.tutorial.demoRemaining)}s</span> : state.tutorial.phase === 'action' ? <strong>↓ Use the highlighted upgrade</strong> : <button className="primary" data-testid="tutorial-next" onClick={() => setState(advanceTutorial)}>{lesson.actionLabel}</button>}<button className="plain-button" onClick={() => setState(skipTutorial)}>Skip tutorial</button></div>
+      </section>}
+      <main>
+        <aside className="left-column">
+          <section className="advisor-card objective-card" data-testid="advisor-card">
+            <span className="eyebrow">{guided ? 'YOUR GUIDE' : 'YOUR CURRENT PRIORITY'}</span>
+            <h2>{guided ? lesson.title : recommendation.title}</h2><p>{guided ? 'Follow the highlighted instruction. The lab pauses while you read, and training grants fund your required upgrades.' : recommendation.reason}</p>
+            {!guided && recommendation.upgradeId && <button className="primary small" onClick={viewRecommendation}>View recommendation →</button>}
+            <div className="objective-progress"><i style={{width:(guided ? (state.tutorial.step+1)/8 : state.upgrades.length/12)*100+'%'}}/></div><small>{guided ? 'Guided orientation' : state.upgrades.length+' / 12 technologies installed'}</small>
+          </section>
+          {state.incident && <section className="incident-card" aria-live="polite"><div className="incident-head"><span>⚠ ACTIVE INCIDENT</span><strong>{Math.ceil(state.incident.remaining)}m</strong></div><h2>{state.incident.title}</h2><p>{state.incident.detail}</p><div className="incident-track"><i style={{width:(1-state.incident.remaining/state.incident.total)*100+'%'}}/></div><small>Your priority card explains which mitigation can help.</small></section>}
+          {state.challenge.active && <section className="incident-card challenge-live"><div className="incident-head"><span>◆ LAUNCH DAY</span><strong>{Math.ceil(state.challenge.remaining)}m</strong></div><h2>Service target: 90%</h2><div className="challenge-number">{Math.round(rate*100)}<small>% served</small></div><p>Reputation: {Math.round(state.reputation)} / target 65</p></section>}
+          {!guided && <Operations state={state} policy={(k,v) => setState(s => setPolicy(s,k,v))} challenge={() => setState(startChallenge)}/>}
+          {!guided && <section className="event-log panel"><header className="panel-heading compact"><h2>Recent events</h2><span className="live-dot">LIVE</span></header><div className="log-list">{state.logs.map(entry => <div key={entry.id} className={entry.tone}><time>{Math.floor(entry.time)}m</time><p>{entry.text}</p></div>)}</div></section>}
+        </aside>
+        <div className="center-column">
+          <InfrastructureMap state={guided && state.tutorial.replay ? { ...state, upgrades: getEffectiveUpgrades(state) } : state} selected={selected} setSelected={setSelected} beginner={guided || welcome} highlight={guided ? lesson.target : undefined}/>
+          <Diagnostics state={state} highlight={guided && lesson.target === 'diagnostics'}/>
+          <section id="economy" className={'economy-panel panel'+(guided && lesson.target === 'economy' ? ' tutorial-highlight' : '')}><header><span>HOW YOUR BUSINESS EARNS</span><small>per game minute</small></header>
+            <div className="economy-flow"><div><span>REQUESTS SERVED</span><strong>{num(state.metrics.served)}</strong></div><b>→</b><div><span>REVENUE</span><strong>{money(state.metrics.gross)}</strong></div><b>−</b><div><span>RUNNING COST</span><strong>{money(state.metrics.expenses)}</strong></div><b>=</b><div className="profit"><span>NET INCOME</span><strong>{money(state.metrics.net)}</strong></div></div>
+            <footer>Each served request earns $4; an AI request earns $12. Dropped requests earn nothing. One real second = one game minute at 1×.</footer>
+          </section>
+        </div>
+        <aside className="right-column" id="upgrade-console"><UpgradePanel state={state} buy={buy} focusId={guided ? lesson.requiredUpgrade : focusId}/></aside>
+      </main>
+      <footer className="controlbar"><div className="sim-controls"><button disabled={guided || welcome} onClick={() => setState(togglePause)}>{state.paused ? '▶ RESUME' : 'Ⅱ PAUSE'}</button>{([1,2,4] as const).map(speed => <button key={speed} disabled={guided || welcome} className={state.speed === speed ? 'active' : ''} onClick={() => setState(s=>setSpeed(s,speed))}>{speed}×</button>)}</div><div className="ticker"><span>{guided ? 'GUIDE' : 'LIVE'}</span><p>{state.logs[0]?.text}</p></div><div className="utility-controls"><button onClick={() => setHelpOpen(true)}>HELP</button><button onClick={() => setReducedMotion(v=>!v)}>MOTION {reducedMotion ? 'OFF':'ON'}</button><button onClick={() => setMuted(v=>!v)}>SOUND {muted ? 'OFF':'ON'}</button><button onClick={() => setSaveOpen(true)}>SAVE</button><button onClick={reset}>RESET</button></div></footer>
+      {hint && !guided && <section className="hint-toast" role="status"><button aria-label="Dismiss hint" className="icon-button" onClick={dismissHint}>×</button><span className="eyebrow">LAB HINT</span><h3>{hint.title}</h3><p>{hint.reason}</p><button className="primary small" onClick={() => { viewRecommendation(); dismissHint() }}>Show me</button></section>}
+    </div>
+    {welcome && <Modal title="Welcome to CloudLab" eyebrow="YOUR FIRST INFRASTRUCTURE LAB">
+      <p>Start with a small office server. Learn how a customer request reaches your system, why bottlenecks happen, and how to fix them.</p>
+      <ol className="welcome-steps"><li><strong>Follow a request</strong><span>See what your gateway, server, and storage do.</span></li><li><strong>Find and fix the bottleneck</strong><span>Install CPU, memory, and storage with training funds.</span></li><li><strong>Build your own architecture</strong><span>Expand into reliable cloud services and AI.</span></li></ol>
+      <p>The tutorial pauses while you read. Required upgrades are funded, and nothing happens until you begin.</p>
+      <div className="dialog-actions"><button onClick={() => setState(skipTutorial)}>Skip to sandbox</button><button className="primary" onClick={() => setState(startTutorial)}>Start tutorial</button></div>
+    </Modal>}
+    {saveOpen && <SaveDialog state={state} close={closeSave} onImport={setState}/>}
+    {pendingBuy && <Modal title="Before you buy" eyebrow="ARCHITECTURE ADVICE" close={closeBuy}><p>{getPurchaseAdvice(state,pendingBuy)}</p><p><strong>Current priority: {recommendation.title}</strong></p><p>{recommendation.reason}</p><div className="dialog-actions"><button onClick={closeBuy}>Cancel</button><button onClick={() => confirmBuy(pendingBuy)}>Buy anyway</button><button className="primary" onClick={viewRecommendation}>View recommendation</button></div></Modal>}
+    {helpOpen && <Modal title="Your infrastructure field guide" eyebrow="LEARN AT YOUR OWN PACE" close={closeHelp}><p><strong>A bottleneck</strong> is the stage with too little capacity for the work reaching it. Improve that stage first to serve more requests.</p><p><strong>Vertical scaling</strong> upgrades one machine. <strong>Horizontal scaling</strong> adds machines; a load balancer distributes their traffic.</p><p><strong>Reliability and security</strong> protect your service during failures and attacks. They do not always raise normal throughput.</p><p><strong>Caching</strong> reuses responses. <strong>Autoscaling</strong> rents capacity as demand changes, balancing cost with response time.</p><p>Replay the lessons on this lab without losing your money or installed upgrades.</p><div className="dialog-actions"><button onClick={closeHelp}>Back to lab</button><button className="primary" onClick={() => { setHelpOpen(false); setState(replayTutorial) }}>Replay tutorial</button></div></Modal>}
   </div>
 }
-
-export default App

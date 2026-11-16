@@ -48,7 +48,7 @@ button:focus-visible, [tabindex]:focus-visible, textarea:focus-visible { outline
 .clock-block span { font: 700 10px/1 var(--pixel); color: #a9bdcd; }
 .clock-block strong { font: 700 8px/1 var(--pixel); color: var(--teal); letter-spacing: 1px; }
 
-main { display: grid; grid-template-columns: 288px minmax(620px, 1fr) 350px; gap: 12px; padding: 12px; max-width: 1920px; margin: 0 auto; }
+main { display: grid; grid-template-columns: 270px minmax(0, 1fr) 340px; gap: 12px; padding: 12px; max-width: 1920px; margin: 0 auto; }
 .left-column, .center-column, .right-column { min-width: 0; display: flex; flex-direction: column; gap: 12px; }
 .panel, .objective-card, .incident-card, .map-shell { border: 1px solid var(--line); background: linear-gradient(145deg, rgba(15,33,53,.96), rgba(8,22,38,.96)); box-shadow: inset 0 1px 0 rgba(255,255,255,.025), 0 9px 28px rgba(0,0,0,.18); }
 .eyebrow { color: var(--teal); font: 700 8px/1 var(--pixel); letter-spacing: 1.7px; }
@@ -85,9 +85,9 @@ main { display: grid; grid-template-columns: 288px minmax(620px, 1fr) 350px; gap
 .health-pill.healthy i { background: var(--teal); box-shadow: 0 0 8px var(--teal); }
 .map-stage { height: 440px; position: relative; overflow: hidden; background: radial-gradient(circle at 70% 35%, rgba(49,86,105,.15), transparent 34%), #081523; }
 .map-grid { position: absolute; inset: 0; background-image: linear-gradient(rgba(47,81,106,.15) 1px, transparent 1px), linear-gradient(90deg, rgba(47,81,106,.15) 1px, transparent 1px); background-size: 24px 24px; mask-image: linear-gradient(to bottom, black, transparent 98%); }
-.map-stage svg { position: relative; width: 100%; height: 100%; overflow: visible; }
+.map-stage svg { position: relative; width: 100%; height: 100%; overflow: hidden; }
 .flow-line { fill: none; stroke: #193149; stroke-width: 4; stroke-dasharray: 5 7; }
-.flow-line.active-line { stroke: #256563; filter: url(#glow); }
+.flow-line.active-line { stroke: #3c9d96; filter: none; }
 .flow-line.cloud-line.active-line { stroke: #566bb7; }
 .packet { fill: var(--teal); filter: url(#glow); }
 .packet-cloud { fill: #8d9cff; }
@@ -145,7 +145,7 @@ main { display: grid; grid-template-columns: 288px minmax(620px, 1fr) 350px; gap
 .economy-panel footer { border-top: 1px solid var(--line-soft); padding: 9px 16px; color: var(--muted); font-size: 10px; }
 .economy-panel footer strong { color: var(--teal); }
 
-.upgrade-panel { height: calc(100vh - 96px); min-height: 650px; position: sticky; top: 84px; display: flex; flex-direction: column; overflow: hidden; }
+.upgrade-panel { height: calc(100vh - 148px); min-height: 0; position: sticky; top: 84px; display: flex; flex-direction: column; overflow: hidden; }
 .upgrade-count { font: 700 11px/1 var(--pixel); color: var(--teal); }
 .filter-tabs { display: grid; grid-template-columns: repeat(5, 1fr); border-bottom: 1px solid var(--line-soft); }
 .filter-tabs button { border: 0; border-right: 1px solid var(--line-soft); background: #091724; color: #718da4; padding: 10px 2px; cursor: pointer; font: 700 7px/1 var(--pixel); }
@@ -227,9 +227,131 @@ main { display: grid; grid-template-columns: 288px minmax(620px, 1fr) 350px; gap
   .topbar { grid-template-columns: 220px 1fr 120px; }
   .status-strip .stat:nth-child(4) { display: none; }
   .status-strip { grid-template-columns: repeat(5, 1fr); }
-  main { grid-template-columns: 250px minmax(520px, 1fr) 320px; }
+  main { grid-template-columns: 220px minmax(0, 1fr) 300px; }
   .map-stage { height: 390px; }
   .capacity-list { grid-template-columns: 1fr; }
   .controlbar { grid-template-columns: 240px 1fr 370px; }
   .controlbar button { padding: 0 9px; }
+}
+
+/* Lessons make one next action visible while the architecture stays in view. */
+.tutorial-banner { border: 1px solid #378d85; border-left: 4px solid var(--teal); background: linear-gradient(120deg, #123d42, #10253a); padding: 20px; position: relative; }
+.tutorial-banner h2, .lesson-title { margin: 9px 0; color: #f3fbff; font: 700 18px/1.3 var(--pixel); }
+.tutorial-banner p { color: #c0d5df; font-size: 14px; line-height: 1.6; margin: 9px 0; }
+.tutorial-banner small { display: block; color: #9dc8c8; font-size: 12px; line-height: 1.5; }
+.lesson-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: 17px; }
+.lesson-actions button, .welcome-dialog button { min-height: 40px; font-size: 11px; line-height: 1.2; }
+.plain-button { background: #102337; border: 1px solid #315168; color: #b9ccd8; padding: 11px 13px; cursor: pointer; font: 700 10px/1.2 var(--pixel); }
+.plain-button:hover { color: white; border-color: #5ba99e; }
+.plain-button:disabled { opacity: .45; cursor: not-allowed; }
+.tutorial-highlight, .upgrade-target { outline: 2px solid var(--teal); outline-offset: 3px; box-shadow: 0 0 22px rgba(68,217,197,.18); }
+.map-node.map-highlight .node-body, .map-node.selected .node-body { stroke: var(--teal); stroke-width: 3px; }
+.map-node.map-highlight .node-top { fill: #16403f; }
+.map-stage { height: 330px; }
+.map-stage.beginner-map { height: 235px; }
+.map-stage.beginner-map:not(.compact-map) { height: 330px; }
+.compact-map .node-title, .compact-map .internet-node text { font-size: 15px; }
+.compact-map .node-code { font-size: 19px; }
+.component-inspector { display: grid; grid-template-columns: 1fr auto; gap: 8px 16px; padding: 17px; background: #0c1c2e; border-top: 1px solid var(--line); }
+.component-inspector h3 { font: 700 13px/1.3 var(--pixel); margin: 6px 0 0; }
+.component-inspector > strong { color: var(--teal); font: 700 10px/1.4 var(--pixel); text-align: right; align-self: end; max-width: 220px; }
+.component-inspector p { grid-column: 1 / -1; color: #b6cbd9; font-size: 13px; line-height: 1.55; margin: 3px 0 0; }
+.component-inspector small { grid-column: 1 / -1; color: #7fa5b9; font-size: 11px; line-height: 1.5; }
+.advisor-card { padding: 17px; background: linear-gradient(135deg, #16313c, #0d1d30); border: 1px solid #3c686d; }
+.advisor-card h2, .advisor-card h3 { color: #e6f5fa; font: 700 14px/1.35 var(--pixel); margin: 9px 0; }
+.advisor-card p { color: #b1cbd5; font-size: 12px; line-height: 1.6; margin: 8px 0; }
+.advisor-card button { margin-top: 9px; }
+.advisor-card small { color: #83b7af; font-size: 11px; line-height: 1.5; }
+.hint-toast { border: 1px solid #997349; border-left: 4px solid var(--amber); background: #302d2b; color: #f8debc; padding: 13px 16px; font-size: 13px; line-height: 1.5; position: relative; }
+.hint-toast { position: fixed; z-index: 40; bottom: 68px; left: 20px; max-width: 390px; box-shadow: 0 8px 35px #0009; }
+.hint-toast h3 { margin: 10px 0 6px; font-size: 15px; }
+.hint-toast .primary { float: none; margin-left: 0; }
+.diagnostic-help { color: var(--muted); font-size: 12px; line-height: 1.5; padding: 0 16px; }
+.request-summary { display: flex; justify-content: space-between; gap: 12px; padding: 0 16px 16px; font-size: 12px; color: var(--muted); }
+.request-summary strong { color: #c8e2e9; }
+.upgrade-copy details { margin-top: 8px; font-size: 12px; color: #a9c5ce; }
+.upgrade-copy summary { cursor: pointer; color: var(--teal); }
+.wait-estimate { grid-column: 1 / -1; font-size: 11px; color: var(--muted); }
+.storage-notice { padding: 10px 20px; background: #513a2a; color: #ffe0b8; font-size: 13px; }
+.controlbar button:disabled { opacity: .4; cursor: not-allowed; }
+.welcome-steps li { padding: 5px 0 5px 5px; }
+.welcome-steps strong, .welcome-steps span { display: block; }
+.welcome-steps span { font-size: 13px; color: var(--muted); }
+.tutorial-banner { display: flex; gap: 24px; align-items: center; margin: 12px; }
+.tutorial-banner > div:first-child { flex: 1; }
+.tutorial-banner .lesson-actions { flex: 0 0 225px; flex-direction: column; align-items: stretch; margin-top: 0; }
+.tutorial-layout .upgrade-panel { position: sticky; top: 84px; }
+.tutorial-layout .advisor-card { padding: 14px; }
+.tutorial-layout .advisor-card p { font-size: 12px; }
+.tutorial-layout main { grid-template-columns: minmax(0, 1fr) 340px; }
+.tutorial-layout .left-column { display: none; }
+.tutorial-layout .upgrade-panel { height: calc(100vh - 340px); min-height: 280px; }
+.tutorial-layout .component-inspector { grid-template-columns: 1fr auto; }
+.readiness { border-left: 2px solid var(--teal); padding-left: 8px; }
+.hint-toast button { float: right; margin-left: 12px; }
+.welcome-dialog { width: min(650px, calc(100vw - 60px)); background: radial-gradient(ellipse at top left, #19464a, transparent 65%), #0c1c2e; border: 1px solid #4b9d96; box-shadow: 12px 12px 0 rgba(0,0,0,.3); padding: 34px; max-height: calc(100vh - 60px); overflow: auto; }
+.welcome-dialog h2 { margin: 14px 0; font: 700 28px/1.2 var(--pixel); color: #f1faf9; }
+.welcome-dialog p { color: #bcd3dd; font-size: 15px; line-height: 1.7; }
+.welcome-dialog ol { color: #bdd5dc; font-size: 14px; line-height: 1.8; padding-left: 20px; }
+.welcome-dialog .eyebrow { font-size: 10px; }
+.welcome-dialog small { color: #8bafb9; line-height: 1.6; }
+.future-milestones { margin: 9px 0; border: 1px dashed #2d4c61; background: #0c1b2a; padding: 12px; color: #8da9bc; font-size: 12px; line-height: 1.6; }
+.future-milestones summary { color: #bad0db; cursor: pointer; font: 700 10px/1.4 var(--pixel); }
+.upgrade-title h3 { font-size: 12px; }
+.upgrade-title strong { font-size: 11px; white-space: nowrap; }
+.upgrade-copy p { font-size: 12px; line-height: 1.4; }
+.upgrade-copy > small { font: 600 10px/1.5 var(--pixel); }
+.upgrade-card > button { font-size: 9px; line-height: 1.4; padding: 10px 8px; }
+.upgrade-card .lesson { display: block; font-size: 11px; line-height: 1.5; }
+.upgrade-card.installed .lesson { display: none; }
+.upgrade-icon { font-size: 10px; }
+.upgrade-copy { min-width: 0; }
+.upgrade-list { min-height: 0; }
+.upgrade-list > .training-lock { font-size: 12px; color: #a1bbc9; line-height: 1.5; padding: 12px; }
+.economy-flow { gap: 5px; padding: 12px; }
+.economy-flow > div { min-width: 0; padding: 9px; }
+.economy-flow span { font-size: 7px; line-height: 1.5; display: block; }
+.economy-flow strong { font-size: 12px; }
+.filter-tabs button { font-size: 9px; padding: 11px 3px; }
+.save-dialog { max-height: calc(100vh - 60px); overflow: auto; }
+.save-dialog p { line-height: 1.5; }
+.dialog-actions { flex-wrap: wrap; }
+.dialog-actions button { font-size: 10px; line-height: 1.3; }
+.dialog-actions button.primary { background: var(--teal); border-color: #58e4d0; color: #061718; }
+.controlbar { grid-template-columns: 245px minmax(0, 1fr) auto; }
+.controlbar button { padding: 0 11px; font-size: 9px; white-space: nowrap; }
+.utility-controls { min-width: 0; }
+.topbar { grid-template-columns: 220px minmax(0, 1fr) 125px; }
+.status-strip { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+.stat { padding-inline: 10px; }
+.stat strong { font-size: 14px; }
+.diagnostics { min-height: 0; }
+@media (max-width: 1260px) {
+  .topbar { grid-template-columns: 190px minmax(0, 1fr) 100px; }
+  .brand { padding-inline: 13px; gap: 10px; }
+  .brand h1 { font-size: 16px; }
+  .brand small { font-size: 7px; letter-spacing: .5px; }
+  .brand-mark { width: 27px; height: 27px; }
+  .status-strip { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+  .stat strong { font-size: 12px; }
+  .stat span { font-size: 7px; letter-spacing: .5px; }
+  .clock-block span { font-size: 8px; }
+  .map-stage { height: 285px; }
+  .map-stage.beginner-map { height: 190px; }
+  .component-inspector { grid-template-columns: 1fr; }
+  .component-inspector > strong { text-align: left; max-width: none; }
+  .component-inspector p { font-size: 12px; }
+  .health-pill { font-size: 6px; padding: 6px; }
+  .panel-heading { padding-inline: 12px; }
+  .panel-heading h2 { font-size: 12px; }
+  .economy-flow { grid-template-columns: 1fr 12px 1fr; gap: 7px; }
+  .economy-flow > b:nth-of-type(2) { display: none; }
+  .controlbar { grid-template-columns: 210px minmax(0, 1fr) auto; }
+  .controlbar button { padding-inline: 8px; font-size: 8px; }
+  .ticker { gap: 6px; padding-inline: 9px; }
+  .ticker p { font-size: 9px; }
+  .tutorial-banner { padding: 16px; }
+  .tutorial-banner h2 { font-size: 16px; }
+  .tutorial-layout main { grid-template-columns: minmax(0, 1fr) 300px; }
+  .tutorial-layout .component-inspector { grid-template-columns: 1fr; }
 }
