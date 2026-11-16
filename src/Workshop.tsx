@@ -1,91 +1,95 @@
-import type { CSSProperties, KeyboardEvent, ReactNode } from 'react'
+import type { KeyboardEvent, ReactNode } from 'react'
 import type { GameState, UpgradeId } from './sim/types'
 import { getEffectiveUpgrades } from './sim/engine'
 
-type Props = { state: GameState; selected: string; setSelected: (id: string) => void; flow: boolean; pulse?: string; beginner?: boolean; highlight?: string; earningPulse?:boolean;presentationPaused?:boolean }
+type Props = { state: GameState; selected: string; setSelected: (id: string) => void; flow: boolean; pulse?: string; beginner?: boolean; highlight?: string; earningPulse?:boolean; presentationPaused?:boolean }
 
-function Machine({ id, label, x, y, selected, setSelected, children, locked, level = 1, pulse, highlight }: {
-  id: string; label: string; x: number; y: number; selected: string; setSelected: (id: string) => void; children: ReactNode; locked?: boolean; level?: number; pulse?: string; highlight?: string
-}) {
-  const key = (event: KeyboardEvent<SVGGElement>) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); setSelected(id) } }
-  const colors=['#718093','#9ba4b5','#70e79b','#60e9ef','#799cff','#b28aff','#f07cdd','#ffab65','#ffdd77','#d9ffff','#7cf6e4']
-  const tier=Math.min(10,Math.max(0,level))
-  const height=id==='cpu'?218:id==='memory'?168:id==='ssd'?105:id==='ai'?211:80
-  return <g role="button" tabIndex={0} aria-label={`Select ${label}`} aria-pressed={selected === id} onClick={() => setSelected(id)} onKeyDown={key} transform={`translate(${x} ${y})`} style={{'--tier-color':colors[tier],'--growth':1+tier*.008,'--base-y':height+'px'} as CSSProperties} data-tier={tier} className={`machine tier-${tier} ${selected === id ? 'machine-selected' : ''} ${locked ? 'machine-locked' : ''} ${pulse === id ? 'machine-pulse' : ''} ${highlight === id ? 'machine-highlight' : ''}`}>
-    <title>{label} · {locked ? 'Future technology — select to learn more' : `Level ${level} — select to upgrade`}</title><g className="machine-model">{children}<path className="tier-trim" d={`M1 14V1h14M92 1h14v13M1 ${height-13}v13h14m77 0h14v-13`} fill="none" stroke="var(--tier-color)" strokeWidth="3"/></g><g className="machine-tag" transform="translate(0 -24)"><rect width="108" height="21" rx="0"/><text x="7" y="14">{label.toUpperCase()}</text><text x="100" y="14" textAnchor="end">{locked ? '◇' : `L${level}`}</text></g>
+function Selectable({id,label,x,y,w=130,h=40,selected,setSelected,locked=false,pulse,children}:{id:string;label:string;x:number;y:number;w?:number;h?:number;selected:string;setSelected:(id:string)=>void;locked?:boolean;pulse?:string;children:ReactNode}) {
+  const key=(e:KeyboardEvent<SVGGElement>)=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();setSelected(id)}}
+  return <g className={`machine ${selected===id?'machine-selected':''} ${locked?'machine-locked':''} ${pulse===id?'machine-pulse':''}`} transform={`translate(${x} ${y})`} role="button" aria-label={`Select ${label}`} aria-pressed={selected===id} tabIndex={0} onClick={()=>setSelected(id)} onKeyDown={key}>
+    <title>{label}{locked?' · not installed':' · select to inspect or upgrade'}</title>{children}<g className="machine-tag" transform="translate(0 -29)"><rect width={w} height="24"/><text x="8" y="17">{label.toUpperCase()}</text></g><rect className="machine-hit" x="-4" y="-32" width={w+8} height={h+36} fill="transparent"/>
   </g>
 }
-
-function Rack({ width = 108, height = 218, tint = '#55d4cf', units = 6 }: { width?: number; height?: number; tint?: string; units?: number }) {
-  return <><path d={`M0 0h${width}v${height}H0Z`} fill="#171b28" stroke="#475062" strokeWidth="3"/><path d={`M${width} 0l13 -8v${height}l-13 8Z`} fill="#10131e"/><rect x="8" y="8" width={width - 16} height={height - 16} fill="#080e19"/>{Array.from({ length: units }, (_, index) => <g key={index} transform={`translate(13 ${17 + index * (height - 33) / units})`}><rect width={width - 26} height={(height - 33) / units - 6} rx="2" fill="#293443"/><path d={`M9 7h${width - 57}M9 12h${width - 57}`} stroke="#111e2a" strokeWidth="3"/><rect className="equipment-led" x={width - 37} y="7" width="5" height="5" fill={tint} style={{ animationDelay: `${index * .31}s` }}/><rect x="5" y={(height - 33) / units - 13} width={width - 38} height="2" fill="#4a5763" opacity=".5"/></g>)}<rect x="12" y={height - 5} width="17" height="10" fill="#070b13"/><rect x={width - 29} y={height - 5} width="17" height="10" fill="#070b13"/></>
+function Rack({x=0,y=0,w=130,h=210,rows=6,tone='#5ef0d1'}:{x?:number;y?:number;w?:number;h?:number;rows?:number;tone?:string}){
+ return <g transform={`translate(${x} ${y})`}><path d={`M0 0h${w}v${h}H0Z`} fill="#121627" stroke="#526179" strokeWidth="4"/><path d={`M${w} 0l12-10v${h}l-12 10Z`} fill="#080d19" stroke="#2b344e" strokeWidth="2"/><rect x="8" y="9" width={w-16} height={h-20} fill="#080e1c"/>{Array.from({length:rows},(_,i)=><g key={i} transform={`translate(14 ${17+i*(h-32)/rows})`}><rect width={w-28} height={(h-32)/rows-7} fill="#243147" stroke="#3b4b63"/><path d={`M8 7h${w-67}m-${w-67} 6h${w-67}`} stroke="#101928" strokeWidth="3"/>{[0,1,2].map(n=><rect key={n} x={w-51+n*7} y="7" width="3" height="3" fill={tone} className="equipment-led" style={{animationDelay:`${i*.2+n*.3}s`}}/>)}</g>)}<path d={`M10 ${h}v9m${w-20}-9v9`} stroke="#070c18" strokeWidth="9"/></g>
 }
-
-export default function Workshop({ state, selected, setSelected, flow, pulse, beginner, highlight,earningPulse,presentationPaused }: Props) {
-  const effective = getEffectiveUpgrades(state)
-  const has = (id: UpgradeId) => effective.includes(id)
-  const levels = state.tutorial.status === 'active' && state.tutorial.replay
-    ? { cpu: has('cpu') ? 1 : 0, memory: has('memory') ? 1 : 0, ssd: has('ssd') ? 1 : 0, network: 0, cloud: 0, ai: 0 } as Record<string, number>
-    : (state as GameState & { equipmentLevels?: Record<string, number> }).equipmentLevels ?? {}
-  const props = (id: string, label: string, x: number, y: number, locked = false) => ({ id, label, x, y, selected, setSelected, locked, level: levels[id] ?? 1, pulse, highlight })
-  const running = !state.paused&&!presentationPaused
-  const tier=(id:string)=>Math.min(10,levels[id]??0)
-  return <div className={`workshop-stage ${has('cloud')?'cloud-era':''} ${earningPulse?'billing-active':''} ${flow ? 'flow-visible' : ''} ${!running ? 'scene-paused' : ''} ${beginner ? 'beginner-workshop' : ''}`} aria-label="CloudLab workshop">
-    <svg className="workshop-room" viewBox="0 0 1280 720" aria-label="A neon-lit server workshop overlooking the city" shapeRendering="crispEdges">
-      <defs>
-        <linearGradient id="night" x2="0" y2="1"><stop stopColor="#080d23"/><stop offset="1" stopColor="#27344a"/></linearGradient>
-        <linearGradient id="wall" x2="0" y2="1"><stop stopColor="#1e2435"/><stop offset="1" stopColor="#141c2b"/></linearGradient>
-        <linearGradient id="floor" x2="0" y2="1"><stop stopColor="#2d2d3a"/><stop offset="1" stopColor="#141824"/></linearGradient>
-        <radialGradient id="amber-glow"><stop stopColor="#ffba5a" stopOpacity=".28"/><stop offset="1" stopColor="#ffba5a" stopOpacity="0"/></radialGradient>
-        <radialGradient id="cyan-glow"><stop stopColor="#19ead6" stopOpacity=".2"/><stop offset="1" stopColor="#19ead6" stopOpacity="0"/></radialGradient>
-        <pattern id="window-lights" width="25" height="29" patternUnits="userSpaceOnUse"><rect x="7" y="8" width="5" height="9" fill="#51b3bd" opacity=".45"/><rect x="17" y="8" width="4" height="9" fill="#ca7ca9" opacity=".3"/></pattern>
-        <pattern id="floor-tiles" width="100" height="53" patternUnits="userSpaceOnUse"><path d="M0 0H100V53" fill="none" stroke="#46505c" strokeOpacity=".18"/></pattern>
-        <clipPath id="city-window"><rect x="48" y="76" width="480" height="344"/></clipPath>
-      </defs>
-      <rect width="1280" height="720" fill="url(#wall)"/>
-      <path d="M0 0H1280V45H0Z" fill="#101522"/><path d="M0 45H1280" stroke="#47505b" strokeWidth="5"/>
-      <path d="M0 540H1280V720H0Z" fill="url(#floor)"/><path d="M0 540H1280V720H0Z" fill="url(#floor-tiles)"/>
-      <path d="M0 540H1280M0 548H1280" stroke="#070c17" strokeWidth="5"/>
-      <path d="M1198 45L1280 0V720L1198 540Z" fill="#101623"/>
-      <g clipPath="url(#city-window)"><rect x="48" y="76" width="480" height="344" fill="url(#night)"/>
-        <circle cx="420" cy="126" r="28" fill="#b5c6d9" opacity=".48"/><circle cx="434" cy="117" r="28" fill="#111b32"/>
-        {[{x:35,y:220,w:80},{x:120,y:140,w:72},{x:198,y:252,w:55},{x:260,y:170,w:100},{x:368,y:221,w:66},{x:438,y:123,w:78}].map((building,i)=><g key={i}><rect x={building.x} y={building.y} width={building.w} height="310" fill={i%2 ? '#131e32' : '#18243a'}/><rect x={building.x+5} y={building.y+8} width={building.w-10} height="290" fill="url(#window-lights)"/><path d={`M${building.x} ${building.y}h${building.w}`} stroke="#42506c" strokeWidth="3"/></g>)}
-        <rect x="146" y="178" width="22" height="109" fill="#423148" stroke="#d67fa7" strokeWidth="2"/><text x="162" y="195" className="city-sign" transform="rotate(90 162 195)" fill="#ff91c7">OPEN 24H</text>
-        <rect x="285" y="230" width="84" height="24" fill="#133445" stroke="#34cfc5" strokeWidth="2"/><text x="294" y="246" className="city-sign" fill="#76f5e1">BYTE BAR</text>
-        <path d="M45 349H528M45 357H528" stroke="#304766" strokeWidth="4"/><g className="city-train"><rect x="61" y="326" width="118" height="20" fill="#33455b"/><path d="M69 332h96" stroke="#e7ab81" strokeWidth="5"/></g>
-        <path d="M90 91l-19 60m110-66-27 85m202-75-19 64m133-16-29 93m-346 39-18 59m244-4-30 91" stroke="#bad8ed" strokeOpacity=".12" strokeWidth="2"/>
-        <g className="cloud-scenery"><rect x="48" y="76" width="480" height="344" fill="#7ce8ef" opacity=".16"/><g className="drifting-cloud cloud-one"><path d="M35 160h35v-18h70v18h42v35H35Z" fill="#b9f8ff" opacity=".38"/></g><g className="drifting-cloud cloud-two"><path d="M310 245h25v-22h68v22h50v34H310Z" fill="#eacbff" opacity=".35"/></g><path d="M52 404h470" stroke="#8eeaff" strokeWidth="4"/></g>
-      </g>
-      <rect x="43" y="71" width="490" height="354" fill="none" stroke="#0a111d" strokeWidth="14"/><rect x="48" y="76" width="480" height="344" fill="none" stroke="#4e6475" strokeWidth="3"/>
-      <path d="M287 77V420M48 291H528" stroke="#0d1625" strokeWidth="9"/><path d="M48 426H538" stroke="#576170" strokeWidth="11"/>
-      <rect x="552" y="62" width="213" height="31" fill="#101925"/><text x="566" y="83" className="room-sign" fill="#65e1cf">CLOUDLAB // 209</text>
-      <path d="M561 106h607v53M548 135h605v54" fill="none" stroke="#36394a" strokeWidth="8"/><path d="M561 106h607" stroke="#536071" strokeWidth="2"/>
-      <g><rect x="680" y="16" width="234" height="18" fill="#0a101a"/><rect x="693" y="30" width="209" height="7" fill="#f4c17a"/><path d="M703 40L568 538H1040L893 40Z" fill="url(#amber-glow)"/></g>
-      <ellipse cx="394" cy="548" rx="300" ry="176" fill="url(#cyan-glow)"/>
-      <ellipse cx="912" cy="497" rx="350" ry="202" fill="url(#amber-glow)"/>
-      <g className="room-detail"><path d="M99 568V654H684V541M376 567V617H870V544M559 276V603H1090V540" fill="none" stroke="#080e19" strokeWidth="12"/><path d="M99 568V654H684V541" fill="none" stroke="#ab7044" strokeWidth="3"/><path d="M376 567V617H870V544" fill="none" stroke="#395f67" strokeWidth="3"/>
-        <path d="M74 692H1165" stroke="#2f3a49" strokeWidth="4"/><path d="M94 688h22m15 0h22m15 0h22m15 0h22m15 0h22m15 0h22m15 0h22" stroke="#73614e" strokeWidth="4"/>
-      </g>
-      <g transform="translate(91 449)"><rect x="0" y="59" width="453" height="22" fill="#6b4a3c"/><rect x="0" y="55" width="453" height="9" fill="#ac7751"/><rect x="15" y="81" width="18" height="84" fill="#272735"/><rect x="415" y="81" width="18" height="84" fill="#272735"/>
-        <rect x="23" y="-50" width="150" height="96" fill="#101824" stroke="#586479" strokeWidth="5"/><rect x="32" y="-41" width="132" height="75" fill="#0b303b"/><path d="M43 -25h43m-43 13h79M43 1h58m-58 13h94" stroke="#52b7b1" strokeWidth="3"/><path d="M98 46V57" stroke="#464a58" strokeWidth="12"/>
-        <rect x="201" y="-30" width="115" height="75" className="billing-terminal" fill="#101824" stroke="#6c9b91" strokeWidth="4"/><rect x="209" y="-22" width="99" height="58" fill="#10393a"/><text x="217" y="-7" className="billing-label">RESPONSE / BILLING</text><path d="m220 13 8 8 14-19" fill="none" stroke="#72efbb" strokeWidth="4"/><text x="267" y="24" className="billing-dollar">$</text><rect className="billing-led" x="301" y="37" width="6" height="5" fill="#78ffd5"/>
-        <path d="M259 45V57" stroke="#464a58" strokeWidth="10"/><path d="M53 68h100m57 0h82" stroke="#2c2d38" strokeWidth="7"/>
-        <rect x="338" y="21" width="24" height="31" fill="#cfc2a6"/><path d="M362 27h10v16h-10" fill="none" stroke="#cfc2a6" strokeWidth="5"/><path d="M345 14v-13m9 12V-1" stroke="#9b9aa1" strokeWidth="2" opacity=".35"/>
-      </g>
-      <Machine {...props('network','Network',555,196)}><rect width="101" height="63" fill="#30394a" stroke="#647084" strokeWidth="3"/><rect x="8" y="11" width="85" height="35" fill="#0d1926"/>{Array.from({length:6},(_,i)=><rect key={i} x={15+i*12} y="20" width="7" height="11" fill="#347c7b"/>)}<path d="M17 63v14m20-14v14m20-14v14m20-14v14" stroke="#bd8655" strokeWidth="3"/></Machine>
-      <Machine {...props('cpu','CPU',665,302)}><rect width="104" height="218" fill="#122a32" stroke="#627e85" strokeWidth="3"/><path d="M15 16v25h22M90 18H67v35M16 191v-41h18m55 41v-37H73" fill="none" stroke="#487363" strokeWidth="4"/><path d="M32 51V35m14 16V35m14 16V35m14 16V35M32 136v16m14-16v16m14-16v16m14-16v16M17 69H4m13 16H4m13 16H4M87 69h13M87 85h13m-13 16h13" stroke="#c2a66e" strokeWidth="4"/><rect x="18" y="51" width="68" height="85" fill="#343544" stroke="#91a1b3" strokeWidth="4"/><rect x="29" y="65" width="46" height="55" fill="#1a1d2e"/>{Array.from({length:4},(_,i)=><path key={i} d={`M34 ${74+i*11}h36`} stroke="var(--tier-color)" strokeWidth="5"/>)}<text x="52" y="178" textAnchor="middle" className="equipment-label">PROCESSOR</text>{Array.from({length:Math.min(5,1+Math.floor(tier('cpu')/2))},(_,i)=><rect key={i} x={12+i*17} y="193" width="12" height="12" fill="var(--tier-color)"/>)}</Machine>
-      <Machine {...props('server2','Server II',792,273,!has('server2'))}><Rack height={247} units={7}/></Machine>
-      <Machine {...props('memory','Memory',920,352)}><rect y="142" width="100" height="26" fill="#2c3947" stroke="#617282" strokeWidth="3"/>{Array.from({length:Math.min(4,2+Math.floor(tier('memory')/3))},(_,i)=><g key={i} transform={`translate(${5+i*24} 12)`}><rect width="18" height="140" fill="#21604e" stroke="var(--tier-color)" strokeWidth="2"/>{[0,1,2,3].map(j=><rect key={j} x="3" y={12+j*27} width="12" height="18" fill="#172331"/>)}<path d="M3 139v11m4-11v11m4-11v11m4-11v11" stroke="#d8b36c" strokeWidth="2"/></g>)}</Machine>
-      <Machine {...props('ssd','Storage',1048,415)}><g className="storage-stack">{Array.from({length:Math.min(5,2+Math.floor(tier('ssd')/2))},(_,i)=><g key={i} transform={`translate(0 ${80-i*25})`}><rect width={76+Math.min(10,tier('ssd'))*2} height="23" fill="#26364e" stroke="var(--tier-color)" strokeWidth="2"/><rect x="7" y="5" width="46" height="12" fill="#101c2d"/><path d="M12 10h28m-28 4h28" stroke="#6b82a1" strokeWidth="2"/><rect className="equipment-led" x="62" y="7" width="6" height="6" fill="#f8cc77"/></g>)}</g></Machine>
-      <Machine {...props('ai','AI',1162,309,!has('ai'))}><rect width="80" height="211" fill="#362940" stroke="#a77aa8" strokeWidth="3"/><path d="M10 16h60m-60 6h60M10 190h60" stroke="#8b6392" strokeWidth="4"/>{[66,143].map(y=><g key={y}><circle cx="40" cy={y} r="29" fill="#121e31" stroke="var(--tier-color)" strokeWidth="3"/><g className="gpu-fan" style={{transformOrigin:`40px ${y}px`}}><path d={`M40 ${y-23}v46m-23-23h46m-39-16 32 32m-32 0 32-32`} stroke="#845995" strokeWidth="7"/></g><circle cx="40" cy={y} r="7" fill="#e5a8db"/></g>)}<path d="M6 211v9m8-9v9m8-9v9m8-9v9m8-9v9m8-9v9m8-9v9m8-9v9" stroke="#d8b66b" strokeWidth="3"/></Machine>
-      <Machine {...props('cloud','Cloud',1007,146,!has('cloud'))}><rect width="135" height="86" fill="#293345" stroke="#526275" strokeWidth="3"/><rect x="9" y="9" width="117" height="59" fill="#131d31"/><path d="M35 46h66c15-3 9-22-4-22-8-24-37-22-43-1-22-10-36 19-19 23Z" fill="none" stroke="#65b5b7" strokeWidth="3"/><path d="M42 74h53" stroke="#dfa56b" strokeWidth="3"/></Machine>
-      <Machine {...props('load_balancer','Balancer',554,335,!has('load_balancer'))}><rect width="82" height="58" fill="#323849" stroke="#586375" strokeWidth="3"/><path d="M14 29h19m0 0 17-15h18M33 29l17 15h18" stroke="#679eaa" strokeWidth="3" fill="none"/></Machine>
-      <Machine {...props('cache','Cache',544,458,!has('cache'))}><rect width="94" height="60" fill="#293746" stroke="#526675" strokeWidth="3"/><rect x="12" y="13" width="70" height="31" fill="#142b31"/><path d="M24 29h13m8 0h13m8 0h6" stroke="#79b299" strokeWidth="4"/></Machine>
-      <Machine {...props('security','Security',553,113,!has('security'))}><rect width="82" height="45" fill="#282f3e" stroke="#4d5e6f" strokeWidth="3"/><path d="M28 11h25v13c0 10-12 15-12 15s-13-6-13-15Z" fill="none" stroke="#aa997b" strokeWidth="2"/></Machine>
-      <Machine {...props('backup','Backup',1039,576,!has('backup'))}><rect width="111" height="55" fill="#2a303d" stroke="#536073" strokeWidth="3"/><rect x="12" y="12" width="86" height="23" fill="#121b28"/><rect x="20" y="20" width="56" height="5" fill="#7c7c8d"/><circle cx="89" cy="23" r="3" fill="#b79a6c"/></Machine>
-      {flow && <g className="scene-flow" aria-hidden="true"><path d="M603 260V287H719V302M719 520V558H974V520M974 520V553H1102V520"/><path d="M603 260V287H719V302" className="flow-travel"/>{has('cloud')&&<path d="M605 196V176H1007" className="cloud-travel"/>}<circle r="5" fill="#72f8db"><animateMotion dur={`${2/state.speed}s`} repeatCount="indefinite" path="M603 260V287H719V302"/></circle></g>}
-      {running&&<g className="billing-route" aria-hidden="true"><path d="M719 520V588H350V498" fill="none" stroke="#4fe7c5" strokeOpacity=".24" strokeWidth="3"/><rect width="9" height="7" fill="#8effcc" className="billing-packet"><animateMotion dur={`${2/state.speed}s`} repeatCount="indefinite" path="M719 520V588H350V498"/></rect></g>}
-      <g className="room-sticker"><rect x="65" y="617" width="153" height="27" fill="#172f35"/><text x="77" y="635">NO COFFEE ON RACKS</text></g>
-    </svg>
-    <div className="scene-caption"><span className="scene-status-dot"/>{state.paused ? 'Lab paused' : 'Systems running'}<span>Click equipment to inspect</span></div>
-  </div>
+function Building({x,y,w,h,i}:{x:number;y:number;w:number;h:number;i:number}){
+ return <g><rect x={x} y={y} width={w} height={h} fill={['#17283b','#172035','#25223c','#122638'][i%4]} stroke="#33485d" strokeWidth="2"/><rect x={x+5} y={y+6} width={w-10} height={h-6} fill="url(#city-windows)"/><path d={`M${x-3} ${y}h${w+6}M${x+8} ${y-4}v-8h${w/3}v8`} stroke="#4f586f" strokeWidth="3" fill="none"/>{Array.from({length:Math.floor(h/54)},(_,n)=><path key={n} d={`M${x} ${y+36+n*54}h${w}`} stroke="#081729" strokeWidth="5"/>)}</g>
+}
+function Neon({x,y,w,text,color='#ff71b8',vertical=false}:{x:number;y:number;w:number;text:string;color?:string;vertical?:boolean}){
+ const h=vertical?text.length*24+20:44
+ return <g transform={`translate(${x} ${y})`} className="neon-sign" style={{color}}><path d={`M-12 9H0m-12 ${h-18}H0`} stroke="#60708a" strokeWidth="5"/><rect width={w} height={h} fill="#161c32" stroke="#4e3658" strokeWidth="4"/><rect x="5" y="5" width={w-10} height={h-10} fill="none" stroke={color} strokeWidth="2" className="neon-tube"/>{vertical?[...text].map((letter,i)=><text key={i} x={w/2} y={27+i*24} textAnchor="middle" fill={color} className="neon-letters">{letter}</text>):<text x={w/2} y="30" textAnchor="middle" fill={color} className="neon-letters">{text}</text>}</g>
+}
+export default function Workshop({state,selected,setSelected,flow,pulse,beginner,highlight,earningPulse,presentationPaused}:Props){
+ const has=(id:UpgradeId)=>getEffectiveUpgrades(state).includes(id)
+ const rooftop=has('server2')&&has('load_balancer'),dc=has('cloud')&&has('autoscaling'),ai=has('ai')
+ const era=ai?'ai':dc?'datacenter':rooftop?'rooftop':'workshop'
+ const running=!state.paused&&!presentationPaused
+ const props=(id:string,label:string,x:number,y:number,w=130,h=40,locked=false)=>({id,label,x,y,w,h,selected,setSelected,locked,pulse})
+ const tier=Math.min(5,state.equipmentLevels.cpu+state.equipmentLevels.memory+state.equipmentLevels.ssd)
+ return <div className={`workshop-stage era-${era} ${earningPulse?'billing-active':''} ${!running?'scene-paused':''} ${beginner?'beginner-workshop':''}`} data-era={era} aria-label="CloudLab workshop">
+  <svg className="workshop-room" viewBox="0 0 1280 720" role="group" aria-label={`${dc?'Data-center operations room':rooftop?'Rooftop server facility':'Street-level server workshop'} overlooking a neon city`} shapeRendering="crispEdges">
+   <defs>
+    <linearGradient id="city-sky" x2="0" y2="1"><stop stopColor="#0b0e27"/><stop offset=".65" stopColor="#252441"/><stop offset="1" stopColor="#9a4654"/></linearGradient>
+    <linearGradient id="room-floor" x2="0" y2="1"><stop stopColor="#393141"/><stop offset="1" stopColor="#111729"/></linearGradient>
+    <linearGradient id="window-haze"><stop stopColor="#d145a0" stopOpacity=".16"/><stop offset=".5" stopColor="#45f0d2" stopOpacity=".03"/><stop offset="1" stopColor="#f6b461" stopOpacity=".15"/></linearGradient>
+    <pattern id="city-windows" width="21" height="25" patternUnits="userSpaceOnUse"><rect x="5" y="5" width="4" height="8" fill="#5ac9cb" opacity=".75"/><rect x="13" y="5" width="3" height="8" fill="#ed6baa" opacity=".55"/><rect x="5" y="15" width="4" height="4" fill="#f9c579" opacity=".38"/></pattern>
+    <pattern id="room-panels" width="160" height="120" patternUnits="userSpaceOnUse"><path d="M0 0h160v120H0Z" fill="#171e32" stroke="#30344c" strokeWidth="3"/><path d="M8 8h144m-144 104h144" stroke="#101529" strokeWidth="2"/><rect x="11" y="12" width="3" height="3" fill="#5c5368"/><rect x="146" y="104" width="3" height="3" fill="#5c5368"/></pattern>
+    <clipPath id="city-view"><rect x="40" y="62" width={dc?640:570} height="402"/></clipPath>
+    <filter id="neon-glow" x="-80%" y="-80%" width="260%" height="260%"><feGaussianBlur stdDeviation="3"/></filter>
+    <filter id="soft-light" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="22"/></filter>
+   </defs>
+   <rect width="1280" height="720" fill="url(#room-panels)"/>
+   {dc&&<g opacity=".65"><path d="M696 37h584v520H696Z" fill="#102d3a"/><path d="M709 44h556v490H709Z" fill="none" stroke="#326576" strokeWidth="5"/>{[0,1,2,3].map(i=><g key={i} transform={`translate(${705+i*143} 45)`}><rect width="132" height="95" fill="#132032" stroke="#356e7b" strokeWidth="2"/><path d="M10 64 23 44l15 7 20-25 22 11 18-16 23 12" fill="none" stroke="#6bdcc7" strokeWidth="3"/><path d="M10 77h111" stroke="#4f8390" strokeWidth="2"/></g>)}</g>}
+   {rooftop&&!dc&&<g><path d="M0 37h690v25H0Z" fill="#293242"/><path d="M12 43h665" stroke="#8a778c" strokeWidth="3"/><path d="M641 58v333m-14-300h32m-38 18h44m-18-34 16-20" stroke="#6d7390" strokeWidth="5"/><rect x="625" y="282" width="42" height="103" fill="#2d3c50" stroke="#647a8d" strokeWidth="3"/><path d="M630 296h30m-30 14h30m-30 14h30m-30 14h30m-30 14h30" stroke="#162639" strokeWidth="5"/></g>}<path d="M0 0h1280v35H0Z" fill="#080f21"/><path d="M0 35h1280" stroke="#3e3951" strokeWidth="5"/>
+   <g clipPath="url(#city-view)">
+    <rect x="40" y="62" width="650" height="402" fill="url(#city-sky)"/>
+    <circle cx="450" cy="126" r="39" fill="#acc9d5" opacity=".7"/><circle cx="464" cy="115" r="37" fill="#20233c"/>
+    {Array.from({length:12},(_,i)=><g key={i}><rect x={30+i*55} y={120+(i*29)%95} width={38+(i%3)*10} height="350" fill="#111c32"/><path d={`M${47+i*55} ${116+(i*29)%95}v-28`} stroke="#425677" strokeWidth="2"/><rect x={46+i*55} y={85+(i*29)%95} width="3" height="4" fill="#f373a9" className="equipment-led"/></g>)}
+    {[{x:15,y:251,w:78,h:245},{x:106,y:171,w:82,h:320},{x:200,y:295,w:61,h:200},{x:275,y:219,w:106,h:300},{x:396,y:273,w:73,h:240},{x:478,y:144,w:108,h:360},{x:600,y:218,w:75,h:300}].map((b,i)=><Building key={i} {...b} i={i}/>)}
+    <g opacity=".5"><path d="M96 250h94M190 337h90M383 278h94" stroke="#91b4b6" strokeWidth="5"/><path d="M107 250v-6h72v6M398 278v-7h59v7" stroke="#4d6578" strokeWidth="2"/></g>
+    <Neon x={128} y={213} w={41} text="OPEN" vertical/>
+    <Neon x={287} y={269} w={145} text="BYTE BAR" color="#6dffe6"/>
+    <Neon x={495} y={164} w={61} text="209" color="#ffcd75"/>
+    <path d="M40 416H680M40 426H680" stroke="#152035" strokeWidth="9"/><path d="M40 414H680" stroke="#b66a95" strokeWidth="2"/>
+    <g className="city-train"><rect x="65" y="386" width="168" height="25" fill="#3f506b"/><path d="M73 391h149" stroke="#89ffeb" strokeWidth="6"/><path d="M90 386v26m29-26v26m29-26v26m29-26v26m29-26v26" stroke="#152039" strokeWidth="4"/><rect x="227" y="397" width="7" height="4" fill="#ffc884"/></g>
+    <g className="city-rain">{Array.from({length:25},(_,i)=><path key={i} d={`M${55+(i*71)%620} ${64+(i*43)%360}l-8 29`} stroke="#abd1eb" strokeOpacity={i%3===0?'.24':'.1'} strokeWidth="2"/>)}</g>
+    <g className="sky-traffic"><path d="M356 158h45l16 10h-71Z" fill="#405576"/><path d="M359 164h29" stroke="#ffdc9f" strokeWidth="3"/><rect x="403" y="164" width="8" height="3" fill="#f58fcb"/></g>
+    <Neon x={30} y={314} w={80} text="RAMEN" color="#ffb076"/>
+    <rect x="43" y="331" width="65" height="112" fill="#ef6b9e" opacity=".08"/>
+    <rect x="283" y="311" width="145" height="103" fill="#52eec9" opacity=".07"/>
+    <path d="M174 156h25v106h-25Z" fill="#244356"/><path d="M186 165v88m-7-74h14m-14 27h14m-14 27h14" stroke="#51d5d7" strokeWidth="3"/>
+    <rect x="40" y="62" width="650" height="402" fill="url(#window-haze)"/>
+    <path d="M44 460h625" stroke="#74d8de" strokeOpacity=".3" strokeWidth="9"/>
+   </g>
+   <rect x="35" y="57" width={dc?650:580} height="412" fill="none" stroke="#080e1c" strokeWidth="14"/><rect x="40" y="62" width={dc?640:570} height="402" fill="none" stroke="#626078" strokeWidth="3"/><path d={`M${dc?360:324} 63v400M40 353h${dc?640:570}`} stroke="#11182a" strokeWidth="10"/><path d="M29 476h666" stroke="#464259" strokeWidth="10"/>
+   {rooftop&&<g className="rooftop-details"><path d="M40 424h570" stroke="#7a8496" strokeWidth="5"/><path d="M70 421v-55m50 55v-55m50 55v-55m50 55v-55m50 55v-55m50 55v-55m50 55v-55m50 55v-55m50 55v-55m50 55v-55m50 55v-55" stroke="#45516a" strokeWidth="3"/><path d="M64 368h540" stroke="#7d7c91" strokeWidth="3"/></g>}
+   <path d="M0 550h1280v170H0Z" fill="url(#room-floor)"/><path d="M0 556h1280M0 656h1280M0 713h1280" stroke="#080e20" strokeWidth="3"/><path d="m150 550-90 170m230-170-50 170m200-170-20 170m200-170 20 170m170-170 50 170m170-170 90 170" stroke="#4b3e53" strokeWidth="2" opacity=".5"/>
+   <path d="M0 583h1280" stroke="#65e6de" strokeOpacity=".08" strokeWidth="16"/>
+   <g transform="translate(730 57)"><rect width="360" height="45" fill="#0c1629" stroke="#415168" strokeWidth="3"/><text x="18" y="30" className="room-sign" fill="#80ffe6">CLOUDLAB // 209</text><path d="M8 38h344" stroke="#4ccdbd" strokeWidth="2"/></g>
+   <path d="M704 119h520v84M713 132h498v72" stroke="#3e455a" strokeWidth="7" fill="none"/><path d="M704 119h520" stroke="#a18196" strokeWidth="2"/>
+   <g><rect x="825" y="17" width="227" height="15" fill="#070d1e"/><rect x="833" y="30" width="210" height="6" fill="#ffd590"/><path d="m845 39-154 515h501L1034 39Z" fill="#ffc17a" opacity=".035"/></g>
+   <g transform="translate(66 499)"><rect x="0" y="47" width="560" height="14" fill="#aa7255"/><rect x="0" y="61" width="560" height="16" fill="#50394b"/><path d="M20 77v101m509-101v101" stroke="#121a2a" strokeWidth="17"/><path d="M25 78v91m500-91v91" stroke="#456075" strokeWidth="3"/>
+    <rect x="24" y="-66" width="175" height="111" fill="#111a2a" stroke="#52617a" strokeWidth="5"/><rect x="32" y="-58" width="159" height="92" fill="#0b2e3a"/><path d="m41 14 18-22 18 8 24-27 20 12 23-31 17 11 20-22" stroke="#74f9d5" strokeWidth="3" fill="none"/><path d="M41 24h140M42-44h49M42-36h28" stroke="#3b7b83" strokeWidth="2"/><text x="41" y="-22" className="monitor-small">SERVICE / LIVE</text><path d="M110 46v10" stroke="#3c465d" strokeWidth="13"/>
+    <rect x="241" y="-43" width="144" height="88" className="billing-terminal" fill="#111c2e" stroke="#5a8b8a" strokeWidth="4"/><rect x="248" y="-36" width="130" height="69" fill="#123333"/><text x="259" y="-18" className="billing-label">RESPONSE / BILLING</text><path d="m260 7 10 10 18-23" stroke="#78f9c9" fill="none" strokeWidth="4"/><text x="323" y="23" className="billing-dollar">$</text><rect x="364" y="37" width="7" height="4" className="billing-led" fill="#72f8cd"/><path d="M310 46v10" stroke="#3b465c" strokeWidth="13"/>
+    <path d="M45 67h135m75 0h115" stroke="#201d32" strokeWidth="5"/><rect x="438" y="17" width="24" height="29" fill="#c6b99c"/><path d="M462 23h10v16h-10" stroke="#c6b99c" fill="none" strokeWidth="5"/><text x="443" y="34" className="mug-label">209</text><path d="M443 8v-15m11 14v-17" stroke="#bcb5b8" strokeOpacity=".3" strokeWidth="2"/>
+   </g>
+   <Selectable {...props('server','Server 01',740,291,150,259)}><Rack w={150} h={259} rows={Math.min(8,4+tier)}/><path d="M22 255h106" stroke="#68f3d3" strokeWidth="2"/></Selectable>
+   <Selectable {...props('server2','Server 02',930,312,130,238,!has('server2'))}><Rack h={238} rows={6} tone="#b395ff"/></Selectable>
+   <Selectable {...props('ai','GPU Pool',1104,347,112,203,!has('ai'))}><rect width="112" height="203" fill="#17213b" stroke="#a87fbc" strokeWidth="3" strokeDasharray="5 4"/><rect x="9" y="9" width="94" height="179" fill="#102435"/>{[0,1].map(i=><g key={i} transform={`translate(56 ${62+i*73})`}><circle r="28" fill="#2b2545" stroke="#9c70b3" strokeWidth="3"/><g className="cooling-fan"><path d="M-18 0h36M0-18v36m-13-13 26 26m-26 0 26-26" stroke="#bb7fc4" strokeWidth="6"/></g><circle r="7" fill="#e3b0e2"/></g>)}<text x="15" y="26" className="equipment-label">REMOTE VIEW</text><text x="9" y="224" className="equipment-label" fill="#ec98dc">{ai?'RENTED · REMOTE':'FUTURE CAPABILITY'}</text></Selectable>
+   <Selectable {...props('network','Network',726,183,150,61)}><rect width="150" height="61" fill="#27374d" stroke="#62788d" strokeWidth="3"/><rect x="9" y="10" width="131" height="30" fill="#101e30"/>{Array.from({length:8},(_,i)=><rect key={i} x={16+i*15} y="18" width="8" height="12" fill="#46bcb0"/>)}<path d="M16 50h117" stroke="#506a7d" strokeWidth="3"/></Selectable>
+   <Selectable {...props('security','Firewall / IAM',925,179,156,65,!has('security'))}><rect width="156" height="65" fill="#233248" stroke="#5c6b85" strokeWidth="3"/><path d="M15 13h29v18c0 12-15 19-15 19s-14-7-14-19Z" stroke="#d9b17b" strokeWidth="3" fill="none"/><path d="M59 18h78m-78 13h54m-54 13h72" stroke="#617c8b" strokeWidth="3"/></Selectable>
+   <Selectable {...props('cloud','Remote Cloud',1114,182,130,71,!has('cloud'))}><rect width="130" height="71" fill="#27324a" stroke="#6e7198" strokeWidth="3"/><rect x="7" y="7" width="116" height="54" fill="#10273b"/><path d="M25 43h81V27H93V18H73V11H54v10H35v9H25Z" fill="#416f92" stroke="#7dc0d0" strokeWidth="2"/><text x="12" y="88" className="equipment-label">RENTED INSTANCES</text></Selectable>
+   <Selectable {...props('load_balancer','Balancer',725,610,152,43,!has('load_balancer'))}><rect width="152" height="43" fill="#25354a" stroke="#60728c" strokeWidth="3"/><path d="M12 21h40l15-11h63M52 21l15 11h63" stroke="#6beed1" strokeWidth="3" fill="none"/></Selectable>
+   <Selectable {...props('cache','Edge Cache',920,610,136,43,!has('cache'))}><rect width="136" height="43" fill="#243e48" stroke="#547d83" strokeWidth="3"/><path d="m34 7-15 18h14l-4 12 20-19H35Z" fill="#ffd083"/><path d="M65 13h53m-53 12h43" stroke="#79c4b6" strokeWidth="3"/></Selectable>
+   <Selectable {...props('backup','Backups',1100,610,130,43,!has('backup'))}><rect width="130" height="43" fill="#30374c" stroke="#69758b" strokeWidth="3"/><rect x="10" y="9" width="109" height="23" fill="#141d31"/><path d="M18 18h68" stroke="#8992ac" strokeWidth="5"/><rect x="103" y="18" width="6" height="6" fill="#eec382"/></Selectable>
+   <g className="room-cables"><path d="M802 244V260H812V280M810 552v22h185V552m-185 22v25M1180 552v33h-173v14" stroke="#091121" strokeWidth="9" fill="none"/><path d="M802 244V260H812V280M810 552v22h185V552" stroke="#497d89" strokeWidth="3" fill="none"/></g>
+   {flow&&running&&state.metrics.served>0&&<g className="scene-flow" aria-hidden="true"><path d="M802 244V260H812V280"/><rect x="798" y="247" width="7" height="7" fill="#75ffe0" className="workshop-data-packet"/></g>}
+   <g className="pixel-person" transform="translate(628 477)"><path d="M10 0h17v8H10Z" fill="#242033"/><rect x="12" y="8" width="13" height="14" fill="#c98a70"/><path d="M8 23h21v37H6Z" fill="#4e455f"/><path d="M11 31h14v21H11Z" fill="#94605e"/><path d="M8 60h9v35H7m14-35h9v35h-9" fill="#172437"/><path d="M3 95h16m1 0h15" stroke="#0b1527" strokeWidth="6"/><path d="M7 25 2 59h8m18-34 7 32h-9" fill="#41415b"/></g>
+   <g className="room-sticker"><rect x="58" y="671" width="271" height="25" fill="#12323a"/><text x="68" y="688">NO COFFEE ON RACKS / EST. 209</text></g>
+   <text x="718" y="696" className="facility-readout">{ai?'04 / AI SERVICE ONLINE':dc?'03 / CLOUD OPERATIONS':rooftop?'02 / ROOFTOP FACILITY':'01 / BORROWED SERVER, BIG IDEAS'}</text>
+   {highlight&&<text x="45" y="38" className="equipment-label" fill="#9ef1c9">TRAINING TARGET / {highlight.toUpperCase()}</text>}
+  </svg>
+  <div className="scene-caption"><span className="scene-status-dot"/>{running?'Systems running':'Lab paused'}<span>Inspect the server to see its components</span></div>
+ </div>
 }

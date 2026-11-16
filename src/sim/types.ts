@@ -53,7 +53,19 @@ export type ChallengeState = {
   retryAt: number
 }
 
+export type Hardware = {
+  cpuCores:number; cpuGHz:number; instructionsPerCycle:number; ramGiB:number; reservedRamGiB:number;
+  storageGiB:number; storageUsedGiB:number; storageIOPS:number; storageMiBs:number; networkMbps:number;
+  gpuCount:number; gpuVRAMGiB:number; serverCount:number; cloudInstances:number; cloudInstanceCores:number; cloudInstanceRamGiB:number
+}
+
 export type Metrics = {
+  hardware: Hardware
+  routes: {arrived:number;cache:number;origin:number;ai:number;rejected:number;pending:number}
+  writeRateGiB:number
+  cloudUsed:number
+  missedRevenue:Record<LossStage,number>
+
   demand: number
   standardDemand: number
   aiDemand: number
@@ -99,8 +111,11 @@ export type AdvisorRecommendation = {
 }
 
 export type GameState = {
-  version: 4
-  revenue: { gross: number; expenses: number; grants: number }
+  version: 5
+  revenue: { gross: number; expenses: number; grants: number; purchases:number; rewards:number; opening:number }
+  storageUsedGiB:number
+  rentalsEnabled:boolean
+  provisioning:{target:number;gpuTarget:number;remaining:number}
   lastPurchase: PurchaseImpact | null
   eventReports: EventReport[]
   cash: number

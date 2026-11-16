@@ -1,9 +1,10 @@
+import {STANDARD_PRICE,AI_PRICE} from './hardware'
 import type { EquipmentId, EventStatistics, LossStage, Metrics, PurchaseImpact, UpgradeId } from './types'
 
 export const STAGES: LossStage[] = ['network','compute','memory','storage','ai']
 export const EQUIPMENT_UNITS: Record<EquipmentId,string> = {
-  cpu:'processing requests/game min', memory:'memory-supported requests/game min', ssd:'data operations/game min',
-  network:'incoming requests/game min', cloud:'managed requests/game min', ai:'inference requests/game min',
+  cpu:'requests/second', memory:'requests/second', ssd:'requests/second',
+  network:'requests/second', cloud:'requests/second', ai:'requests/second',
 }
 export const STAGE_NAMES: Record<LossStage,string> = {network:'Network ingress',compute:'CPU processing',memory:'Memory',storage:'Storage I/O',ai:'AI inference'}
 export const TECHNOLOGY_TIPS: Record<string,string> = {
@@ -25,11 +26,10 @@ export const EVENT_STORIES = {
 }
 export const emptyEventStats = (partial=false): EventStatistics => ({duration:0,standardRequests:0,aiRequests:0,served:0,dropped:0,gross:0,expenses:0,potentialGross:0,extraRequests:0,missedByStage:{network:0,compute:0,memory:0,storage:0,ai:0},partial})
 export function integrateEvent(stats:EventStatistics,m:Metrics,dt:number,extraDemand:number) {
-  stats.duration+=dt;stats.standardRequests+=m.standardDemand*dt;stats.aiRequests+=m.aiDemand*dt
-  stats.served+=m.served*dt;stats.dropped+=m.dropped*dt;stats.gross+=m.gross*dt;stats.expenses+=m.expenses*dt
-  stats.potentialGross+=(m.standardDemand*4+m.aiDemand*12)*dt;stats.extraRequests+=Math.max(0,extraDemand)*dt
-  const networkPrice=m.demand>0?(m.standardDemand*4+m.aiDemand*12)/m.demand:4
-  for(const stage of STAGES) stats.missedByStage[stage]+=m.losses[stage]*(stage==='network'?networkPrice:stage==='ai'?12:4)*dt
+  stats.duration+=dt;stats.standardRequests+=m.standardDemand*dt*60;stats.aiRequests+=m.aiDemand*dt*60
+  stats.served+=m.served*dt*60;stats.dropped+=m.dropped*dt*60;stats.gross+=m.gross*dt;stats.expenses+=m.expenses*dt
+  stats.potentialGross+=(m.standardDemand*STANDARD_PRICE+m.aiDemand*AI_PRICE)*dt*60;stats.extraRequests+=Math.max(0,extraDemand)*dt*60
+  for(const stage of STAGES) stats.missedByStage[stage]+=m.missedRevenue[stage]*dt
 }
 export const equipmentMetric = (id:EquipmentId,m:Metrics) => id==='cpu'?m.compute:id==='ssd'?m.storage:id==='ai'?m.aiCapacity:m[id]
 export function impactRows(impact:PurchaseImpact) {
@@ -38,12 +38,12 @@ export function impactRows(impact:PurchaseImpact) {
     const before=equipmentMetric(id,impact.before),after=equipmentMetric(id,impact.after)
     if(Math.abs(after-before)>.000001)rows.push({label:id==='ssd'?'Storage':id==='cpu'?'CPU':id==='ai'?'AI':id[0].toUpperCase()+id.slice(1),unit:EQUIPMENT_UNITS[id],before,after})
   }
-  if(Math.abs(impact.after.expenses-impact.before.expenses)>.000001)rows.push({label:'Operating cost',unit:'$/game min',before:impact.before.expenses,after:impact.after.expenses})
+  if(Math.abs(impact.after.expenses-impact.before.expenses)>.000001)rows.push({label:'Operating cost',unit:'$/minute',before:impact.before.expenses,after:impact.after.expenses})
   return rows
 }
 export function impactSummary(impact:PurchaseImpact) {
   const served=impact.after.served-impact.before.served, net=impact.after.net-impact.before.net
   if(Math.abs(served)<.000001&&Math.abs(net)<.000001)return impact.after.bottleneck==='healthy'?'More headroom; current demand is already served.':`More headroom; ${STAGE_NAMES[impact.after.bottleneck]} is still the limiting stage.`
-  return `${served>=0?'+':''}${served.toFixed(2)} requests served/game min · ${net>=0?'+':'−'}$${Math.abs(net).toFixed(2)}/game min net, at current demand.`
+  return `${served>=0?'+':''}${served.toFixed(2)} requests served/second · ${net>=0?'+':'−'}$${Math.abs(net).toFixed(2)}/minute net, at current demand.`
 }
 export const isTechnology = (id:string):id is UpgradeId => ['virtualization','server2','load_balancer','backup','security','cache','cloud','autoscaling','ai'].includes(id)
