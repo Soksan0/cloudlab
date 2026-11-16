@@ -21,13 +21,15 @@ npm run test:e2e
 
 New labs begin at a paused welcome screen. Choose **Start tutorial** for eight guided lessons, or **Skip to sandbox** to experiment immediately. Explanations pause the company; short demonstrations show request flow and bottlenecks. Training grants cover CPU, memory, and SSD purchases.
 
-After orientation, the priority card diagnoses the current constraint and recommends an available upgrade or the next prerequisite. A purchase that will not solve that constraint prompts advice before spending, with **Buy anyway** available. Reliability purchases can still be sensible even when they do not increase throughput.
+After orientation, **Hint** is optional and always visible. It explains the current constraint and can highlight an upgrade. Purchases happen directly. Reliability investments can protect the service even when they do not increase throughput.
 
-Click any map component for its purpose, current capacity, and related upgrades. **Help** provides a glossary and tutorial replay on the current lab without deleting progress.
+Click workshop equipment to open its controls. CPU, memory, storage, network, cloud, and AI support repeatable levels, bought singly or with **Max**. Prices grow by 35% per level, rounded up; levels add permanent capacity alongside rented elastic capacity. Technology unlocks new systems. **Help** provides tutorial replay without deleting progress.
+
+Ten achievements automatically credit cash once. Major incidents and first technology unlocks pause for a central announcement; **Continue** preserves your previous manual pause state. Achievement celebrations do not stop play. Diagnostics, operating policies, achievements, and event history live in compact drawers beneath the workshop.
 
 Standard requests earn $4 and AI requests $12. Operating expenses are deducted separately. One real second equals one game minute at normal speed. Economy autoscaling reacts after ten game minutes; Resilient reacts after three, maintains more capacity, and costs more.
 
-Progress is stored in localStorage, including tutorial progress and manual pause. Version-one saves migrate automatically. Closing or hiding the page never produces offline earnings. Export a backup with **Save**; invalid imports do not replace the current company.
+Progress is stored in localStorage, including tutorial progress, equipment levels, achievement records, pending announcements, and manual pause. Version-one and version-two saves migrate to version three with purchases and cash preserved; historical achievements are recognized without backpay. Closing or hiding the page never produces offline earnings. Export a backup with **Save**; invalid imports do not replace the current company.
 
 ## QA
 

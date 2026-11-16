@@ -8,6 +8,11 @@ export type PolicyState = {
   autoscaling: 'economy' | 'resilient'
 }
 
+export type EquipmentId = 'cpu' | 'memory' | 'ssd' | 'network' | 'cloud' | 'ai'
+export type EquipmentDefinition = { id: EquipmentId; name: string; baseCost: number; increase: number; unlock?: UpgradeId }
+export type Announcement = { id: string; kind: 'incident' | 'technology' | 'achievement' | 'challenge'; title: string; body: string; actionLabel: string }
+export type AchievementDefinition = { id: string; name: string; description: string; reward: number }
+
 export type UpgradeDefinition = {
   id: UpgradeId
   name: string
@@ -43,6 +48,7 @@ export type Metrics = {
   demand: number
   standardDemand: number
   aiDemand: number
+  aiServed: number
   served: number
   dropped: number
   successRate: number
@@ -77,13 +83,13 @@ export type AdvisorRecommendation = {
   id: string
   title: string
   reason: string
-  upgradeId?: UpgradeId
+  upgradeId?: UpgradeId | EquipmentId
   target: string
   priority: 'capacity' | 'risk' | 'healthy'
 }
 
 export type GameState = {
-  version: 2
+  version: 3
   cash: number
   reputation: number
   elapsed: number
@@ -91,6 +97,14 @@ export type GameState = {
   paused: boolean
   speed: 1 | 2 | 4
   upgrades: UpgradeId[]
+  equipmentLevels: Record<EquipmentId, number>
+  aiServed: number
+  stableServiceMinutes: number
+  incidentsRecovered: number
+  achievementIDs: string[]
+  announcements: Announcement[]
+  acknowledgedAnnouncements: string[]
+  announcementSequence: number
   policies: PolicyState
   policyCooldownUntil: number
   tutorialStep: number
