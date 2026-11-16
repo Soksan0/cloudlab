@@ -10,7 +10,15 @@ export type PolicyState = {
 
 export type EquipmentId = 'cpu' | 'memory' | 'ssd' | 'network' | 'cloud' | 'ai'
 export type EquipmentDefinition = { id: EquipmentId; name: string; baseCost: number; increase: number; unlock?: UpgradeId }
-export type Announcement = { id: string; kind: 'incident' | 'technology' | 'achievement' | 'challenge'; title: string; body: string; actionLabel: string }
+export type Announcement = { id: string; kind: 'incident' | 'technology' | 'achievement' | 'challenge' | 'report'; title: string; body: string; actionLabel: string; illustration?: string; reportId?: string; impact?: PurchaseImpact; tip?: string }
+export type LossStage = 'network' | 'compute' | 'memory' | 'storage' | 'ai'
+export type PurchaseImpact = { id: string; at: number; before: Metrics; after: Metrics }
+export type EventStatistics = {
+  duration: number; standardRequests: number; aiRequests: number; served: number; dropped: number;
+  gross: number; expenses: number; potentialGross: number; extraRequests: number;
+  missedByStage: Record<LossStage, number>; partial: boolean
+}
+export type EventReport = EventStatistics & { id: string; kind: IncidentKind; title: string; endedAt: number; dominantStage: LossStage | null }
 export type AchievementDefinition = { id: string; name: string; description: string; reward: number }
 
 export type UpgradeDefinition = {
@@ -33,6 +41,7 @@ export type Incident = {
   detail: string
   remaining: number
   total: number
+  stats?: EventStatistics
 }
 
 export type ChallengeState = {
@@ -49,6 +58,7 @@ export type Metrics = {
   standardDemand: number
   aiDemand: number
   aiServed: number
+  losses: Record<LossStage, number>
   served: number
   dropped: number
   successRate: number
@@ -89,7 +99,10 @@ export type AdvisorRecommendation = {
 }
 
 export type GameState = {
-  version: 3
+  version: 4
+  revenue: { gross: number; expenses: number; grants: number }
+  lastPurchase: PurchaseImpact | null
+  eventReports: EventReport[]
   cash: number
   reputation: number
   elapsed: number

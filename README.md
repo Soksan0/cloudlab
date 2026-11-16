@@ -29,7 +29,13 @@ Ten achievements automatically credit cash once. Major incidents and first techn
 
 Standard requests earn $4 and AI requests $12. Operating expenses are deducted separately. One real second equals one game minute at normal speed. Economy autoscaling reacts after ten game minutes; Resilient reacts after three, maintains more capacity, and costs more.
 
-Progress is stored in localStorage, including tutorial progress, equipment levels, achievement records, pending announcements, and manual pause. Version-one and version-two saves migrate to version three with purchases and cash preserved; historical achievements are recognized without backpay. Closing or hiding the page never produces offline earnings. Export a backup with **Save**; invalid imports do not replace the current company.
+Progress is stored in localStorage, including tutorial progress, equipment levels, achievement records, pending announcements, and manual pause. Older saves migrate to version four with purchases and cash preserved; historical achievements are recognized without backpay. Closing or hiding the page never produces offline earnings. Export a backup with **Save**; invalid imports do not replace the current company.
+
+Equipment benefits use simplified workload limits, not literal GHz or GB. Purchase previews and celebrations calculate effective rates before and after the purchase, including policies and virtualization, and show income changes at current demand. The billing terminal animates recorded customer gross revenue; rewards and spending never appear as customer earnings.
+
+Incidents accumulate measured requests, revenue, costs, and losses throughout their game-time duration. Their reports compare actual gross earnings with the ceiling from serving all arriving paid requests, identify the dominant limiting stage, and remain available in event history. Incidents imported from older saves measure only the portion after migration and label this explicitly.
+
+The pixel illustrations are original SVG artwork. The locally bundled Press Start 2P display font is licensed under the SIL Open Font License; see public/fonts/OFL.txt. Reduced motion uses static artwork and immediate scenery changes; mute disables feedback sounds.
 
 ## QA
 

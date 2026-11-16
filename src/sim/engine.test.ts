@@ -215,7 +215,7 @@ describe('save compatibility and validation', () => {
     const s = withUpgrades('memory')
     const legacy = { ...s, version: 1, tutorial: undefined, upgradeTimes: undefined, cloudProvisioned: undefined, aiProvisioned: undefined, scaleTimer: undefined }
     const loaded = loadGame(JSON.stringify(legacy))!
-    expect(loaded.version).toBe(3); expect(loaded.upgrades).toEqual(s.upgrades); expect(loaded.cash).toBe(s.cash)
+    expect(loaded.version).toBe(4); expect(loaded.upgrades).toEqual(s.upgrades); expect(loaded.cash).toBe(s.cash)
     expect(loaded.tutorial.status).toBe('skipped')
   })
   it.each([
@@ -345,7 +345,7 @@ describe('achievement rewards and announcements', () => {
     const s = withUpgrades(); s.totalServed = 200; s.completed = true
     const old = {...s,version:2,equipmentLevels:undefined,achievementIDs:undefined,announcements:undefined,acknowledgedAnnouncements:undefined,announcementSequence:undefined,aiServed:undefined,stableServiceMinutes:undefined,incidentsRecovered:undefined}
     const loaded = loadGame(JSON.stringify(old))!
-    expect(loaded.version).toBe(3); expect(loaded.cash).toBe(s.cash)
+    expect(loaded.version).toBe(4); expect(loaded.cash).toBe(s.cash)
     expect(loaded.equipmentLevels.cpu).toBe(1); expect(loaded.equipmentLevels.cloud).toBe(0)
     expect(loaded.achievementIDs).toContain('requests-100'); expect(loaded.achievementIDs).toContain('launch')
     expect(getNextAnnouncement(loaded)).toBeUndefined()
