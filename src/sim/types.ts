@@ -12,7 +12,7 @@ export type EquipmentId = 'cpu' | 'memory' | 'ssd' | 'network' | 'cloud' | 'ai'
 export type EquipmentDefinition = { id: EquipmentId; name: string; baseCost: number; increase: number; unlock?: UpgradeId }
 export type Announcement = { id: string; kind: 'incident' | 'technology' | 'achievement' | 'challenge' | 'report'; title: string; body: string; actionLabel: string; illustration?: string; reportId?: string; impact?: PurchaseImpact; tip?: string }
 export type LossStage = 'network' | 'compute' | 'memory' | 'storage' | 'ai'
-export type PurchaseImpact = { id: string; at: number; before: Metrics; after: Metrics }
+export type PurchaseImpact = { id: string; at: number; before: Metrics; after: Metrics; beforeLevel?:number; afterLevel?:number; quantity?:number; cost?:number }
 export type EventStatistics = {
   duration: number; standardRequests: number; aiRequests: number; served: number; dropped: number;
   gross: number; expenses: number; potentialGross: number; extraRequests: number;
@@ -99,6 +99,7 @@ export type TutorialState = {
   demoRemaining: number
   replay: boolean
   demonstrated: boolean
+  returnPaused?: boolean
 }
 
 export type AdvisorRecommendation = {
@@ -112,6 +113,7 @@ export type AdvisorRecommendation = {
 
 export type GameState = {
   version: 5
+  uiRevision?: 2
   revenue: { gross: number; expenses: number; grants: number; purchases:number; rewards:number; opening:number }
   storageUsedGiB:number
   rentalsEnabled:boolean

@@ -1,7 +1,8 @@
 import { expect, test, type Page } from '@playwright/test'
+import { readFile } from 'node:fs/promises'
 import {
   acknowledgeAnnouncement, calculateMetrics, createInitialState, getNextAnnouncement,
-  purchaseEquipment, purchaseUpgrade, serializeGame, skipTutorial, startChallenge,
+  purchaseEquipment, purchaseUpgrade, serializeGame, skipTutorial,
   stepGame, triggerIncident,
 } from '../src/sim/engine'
 import { UPGRADES } from '../src/sim/upgrades'
@@ -16,389 +17,511 @@ test.beforeEach(async ({ page }) => {
 test.afterEach(async ({ page }) => {
   expect(pageErrors.get(page), 'No unhandled browser errors').toEqual([])
 })
-
 function acknowledgeAll(state: GameState) {
-  let event = getNextAnnouncement(state)
-  while (event) { state = acknowledgeAnnouncement(state, event.id); event = getNextAnnouncement(state) }
+  let next = getNextAnnouncement(state)
+  while (next) { state = acknowledgeAnnouncement(state, next.id); next = getNextAnnouncement(state) }
   return state
 }
 function fund(state: GameState, cash: number) {
-  state.cash = cash
   const r = state.revenue
   r.opening = cash - r.gross - r.grants - r.rewards + r.purchases + r.expenses
+  state.cash = cash
   return state
 }
 function sandbox(upgrades: UpgradeId[] = []) {
-  let state = fund(skipTutorial(createInitialState()), 1_000_000)
-  for (const id of upgrades) state = acknowledgeAll(purchaseUpgrade(state, id))
-  state.incident = null; state.incidentQueue = []; state.nextIncidentAt = 1_000_000
-  state.paused = false; state.reputation = 80; state.metrics = calculateMetrics(state)
-  return state
+  let s = fund(skipTutorial(createInitialState()), 1_000_000)
+  for (const id of upgrades) s = acknowledgeAll(purchaseUpgrade(s, id))
+  s.incident = null; s.incidentQueue = []; s.nextIncidentAt = 1_000_000
+  s.paused = false; s.reputation = 80; s.metrics = calculateMetrics(s)
+  return s
 }
-function completeLab() { return sandbox(UPGRADES.map(upgrade => upgrade.id)) }
+function completeLab() {
+  return acknowledgeAll(stepGame(sandbox(UPGRADES.map(u => u.id)), 2.1))
+}
 async function openGame(page: Page, state?: GameState | string) {
   await page.clock.install()
   await page.addInitScript(({ key, save }) => {
     if (!sessionStorage.getItem('cloudlab-test-initialized')) {
-      localStorage.clear(); if (save) localStorage.setItem(key, save)
+      localStorage.clear()
+      if (save) localStorage.setItem(key, save)
       sessionStorage.setItem('cloudlab-test-initialized', 'yes')
     }
   }, { key: SAVE_KEY, save: typeof state === 'string' ? state : state ? serializeGame(state) : null })
   await page.goto('/')
+  await page.clock.runFor(450)
 }
-async function saveSnapshot(page: Page): Promise<GameState> {
-  await page.getByRole('button', { name: /^save$/i }).click()
-  const value = await page.getByLabel('Save data').inputValue()
-  await page.getByRole('button', { name: 'Close', exact: true }).click()
-  return JSON.parse(value)
+async function snapshot(page: Page): Promise<GameState> {
+  return page.evaluate(key => {
+    window.dispatchEvent(new Event('pagehide'))
+    return JSON.parse(localStorage.getItem(key)!)
+  }, SAVE_KEY)
 }
-function expectBalanced(state: GameState) {
-  const r = state.revenue
-  expect(state.cash).toBeCloseTo(r.opening + r.gross + r.grants + r.rewards - r.purchases - r.expenses, 6)
+function expectBalanced(s: GameState) {
+  const r = s.revenue
+  expect(s.cash).toBeCloseTo(r.opening + r.gross + r.grants + r.rewards - r.purchases - r.expenses, 6)
+}
+async function utility(page: Page, name: string) {
+  await page.getByRole('button', { name: 'Menu', exact: true }).click()
+  await page.getByRole('button', { name, exact: true }).click()
+}
+async function selectComponent(page: Page, id: string, category: 'Equipment' | 'Technology' = 'Equipment') {
+  if (await page.getByRole('button', { name: /^Tune components/ }).isVisible()) {
+    await page.getByRole('button', { name: /^Tune components/ }).click()
+  }
+  const console = page.getByTestId('tuning-console')
+  await console.getByRole('button', { name: category, exact: true }).click()
+  await console.getByLabel('Component', { exact: true }).selectOption(id)
+  await page.clock.runFor(450)
+}
+async function continueMajor(page: Page) {
+  for (let i = 0; i < 20 && await page.getByTestId('major-announcement').isVisible(); i++) {
+    await page.getByTestId('major-announcement').getByRole('button', { name: /^Continue/ }).click()
+  }
 }
 async function finishTutorial(page: Page) {
-  let turns = 0
-  while (turns++ < 45 && await page.getByTestId('tutorial-banner').isVisible()) {
-    const banner = page.getByTestId('tutorial-banner'), phase = await banner.getAttribute('data-phase')
-    if (phase === 'demo') await page.clock.runFor(6_000)
-    else if (phase === 'action') {
-      const purchase = page.locator('.tutorial-target').getByRole('button', { name: /^Purchase / })
-      await expect(purchase).toBeEnabled()
-      await purchase.click()
-    } else await page.getByTestId('tutorial-next').click()
+  for (let i = 0; i < 45; i++) {
+    const coach = page.getByTestId('tutorial-coach')
+    if (!await coach.isVisible()) return
+    const step = Number(await coach.getAttribute('data-step'))
+    const phase = await coach.getAttribute('data-phase')
+    if (phase === 'explain'||await coach.getByRole('button',{name:/^Continue tutorial/}).isVisible()) await coach.getByRole('button', { name: /^Continue tutorial/ }).click()
+    else if (step === 1) await page.getByRole('button', { name: 'Select Server 01', exact: true }).click()
+    else if (step === 2) await page.getByRole('button', { name: 'Inspect CPU', exact: true }).click()
+    else if (step >= 3 && step <= 5) {
+      const name = ['CPU', 'Memory', 'Storage (SSD)'][step - 3]
+      await page.getByTestId('tuning-console').getByRole('button', { name: `Upgrade ${name}`, exact: true }).click()
+    } else if (step === 6) await page.getByRole('button', { name: 'Hint', exact: true }).click()
+    else await page.clock.runFor(500)
   }
-  await expect(page.getByTestId('tutorial-banner')).toBeHidden()
+  await expect(page.getByTestId('tutorial-coach')).toBeHidden()
+}
+async function expectViewportFit(page: Page) {
+  const bounds = await page.evaluate(() => ({
+    w: innerWidth, h: innerHeight,
+    pageW: document.documentElement.scrollWidth,
+    pageH: document.documentElement.scrollHeight,
+  }))
+  expect(bounds.pageW, 'No horizontal page scrolling').toBeLessThanOrEqual(bounds.w + 1)
+  expect(bounds.pageH, 'No vertical page scrolling').toBeLessThanOrEqual(bounds.h + 1)
+  const console = page.getByTestId('tuning-console')
+  if (await console.isVisible()) {
+    const box = await console.boundingBox()
+    expect(box).not.toBeNull()
+    expect(box!.x).toBeGreaterThanOrEqual(0)
+    expect(box!.y).toBeGreaterThanOrEqual(0)
+    expect(box!.x + box!.width).toBeLessThanOrEqual(bounds.w + 1)
+    expect(box!.y + box!.height).toBeLessThanOrEqual(bounds.h + 1)
+    const dimensions = await console.evaluate(node => ({
+      scroll:node.scrollHeight,client:node.clientHeight,
+      children:[...node.children].map(child=>({tag:child.tagName,class:child.className,height:child.getBoundingClientRect().height}))
+    }))
+    expect(dimensions.scroll, `No console scrolling: ${JSON.stringify(dimensions)}`).toBeLessThanOrEqual(dimensions.client+1)
+    const clipped = await console.evaluate(node => {
+      const panel = node.getBoundingClientRect()
+      return [...node.querySelectorAll('button,select')].filter(control => {
+        const r = control.getBoundingClientRect()
+        return r.width > 0 && r.height > 0 && (r.left < panel.left - 1 || r.right > panel.right + 1 || r.top < panel.top - 1 || r.bottom > panel.bottom + 1)
+      }).map(control => control.getAttribute('aria-label') || control.textContent)
+    })
+    expect(clipped, 'Tuning controls are not clipped').toEqual([])
+  }
+  const dialog = page.getByRole('dialog')
+  if (await dialog.isVisible()) {
+    const box = await dialog.boundingBox()
+    expect(box!.x).toBeGreaterThanOrEqual(0)
+    expect(box!.y).toBeGreaterThanOrEqual(0)
+    expect(box!.x + box!.width).toBeLessThanOrEqual(bounds.w + 1)
+    expect(box!.y + box!.height).toBeLessThanOrEqual(bounds.h + 1)
+    expect(await dialog.evaluate(node => node.scrollHeight <= node.clientHeight + 1), 'No dialog scrolling').toBe(true)
+  }
 }
 
-test('welcome requires a choice and leaves the company paused while reading', async ({ page }) => {
+test('welcome requires a choice and keeps reading time free', async ({ page }) => {
   await openGame(page)
-  const welcome = page.getByRole('dialog', { name: 'Your cloud starts here.' })
-  await expect(welcome).toBeVisible(); await page.clock.runFor(5_000)
-  await expect(welcome).toBeVisible()
-  await page.getByRole('button', { name: 'Skip to sandbox', exact: true }).click()
-  await expect(welcome).toBeHidden()
-  expect((await saveSnapshot(page)).elapsed).toBeLessThan(1)
-})
-
-test('a beginner completes funded guided actions and reaches independent play', async ({ page }) => {
-  await page.setViewportSize({ width: 1440, height: 900 }); await openGame(page)
-  await page.getByRole('button', { name: 'Start tutorial', exact: true }).click()
-  await finishTutorial(page)
-  const snapshot = await saveSnapshot(page)
-  expect(snapshot.tutorialComplete).toBe(true)
-  expect(snapshot.upgrades).toEqual(expect.arrayContaining(['cpu', 'memory', 'ssd']))
-  expectBalanced(snapshot)
-  await expect(page.getByTestId('milestone-strip')).toBeVisible()
-  await page.screenshot({ path: 'test-results/cloudlab-tutorial.png' })
-})
-
-test('tutorial reload restores the lesson and skipping reaches equipment', async ({ page }) => {
-  await openGame(page); await page.getByRole('button', { name: 'Start tutorial', exact: true }).click()
-  await page.getByTestId('tutorial-next').click(); await page.clock.runFor(6_000)
-  const step = await page.getByTestId('tutorial-banner').getAttribute('data-step')
-  await saveSnapshot(page); await page.reload()
-  await expect(page.getByTestId('tutorial-banner')).toHaveAttribute('data-step', step!)
-  await page.getByRole('button', { name: 'Skip tutorial', exact: true }).click()
-  await expect(page.getByRole('button', { name: 'Upgrade CPU', exact: true })).toBeVisible()
-})
-
-test('equipment purchases repeat and Max stays within physical tiers and funds', async ({ page }) => {
-  const state = fund(sandbox(), 5_000); state.paused = true
-  await openGame(page, state)
-  const cpu = page.getByRole('button', { name: 'Upgrade CPU', exact: true })
-  await cpu.click(); await cpu.click()
-  await expect(page.getByRole('dialog')).toBeHidden()
-  expect((await saveSnapshot(page)).equipmentLevels.cpu).toBe(2)
-  await page.getByRole('button', { name: /^(Buy )?Max$/i }).click()
-  await page.getByRole('button', { name: 'Upgrade Memory', exact: true }).click()
-  const snapshot = await saveSnapshot(page)
-  expect(snapshot.equipmentLevels.memory).toBeGreaterThan(1)
-  expect(snapshot.equipmentLevels.memory).toBeLessThanOrEqual(6)
-  expect(snapshot.cash).toBeGreaterThanOrEqual(0)
-  expectBalanced(snapshot)
-})
-
-test('all equipment tracks and technologies remain reachable through the tray', async ({ page }) => {
-  const state = sandbox(); state.paused = true
-  await openGame(page, state)
-  for (const name of ['CPU', 'Memory', 'Storage', 'Network']) await page.getByRole('button', { name: `Upgrade ${name}`, exact: true }).click()
-  await page.getByRole('button', { name: /^Technology/ }).click()
-  for (const upgrade of UPGRADES.filter(upgrade => !['cpu', 'memory', 'ssd'].includes(upgrade.id))) {
-    await page.getByRole('button', { name: `Unlock ${upgrade.name}`, exact: true }).click()
-    await expect(page.getByRole('dialog')).toBeHidden()
-  }
-  await page.getByRole('button', { name: 'Equipment', exact: true }).click()
-  await page.getByRole('button', { name: 'Upgrade Cloud capacity', exact: true }).click()
-  await page.getByRole('button', { name: 'Upgrade AI capacity', exact: true }).click()
-  const snapshot = await saveSnapshot(page)
-  expect(snapshot.upgrades).toHaveLength(12)
-  for (const level of Object.values(snapshot.equipmentLevels)) expect(level).toBeGreaterThan(0)
-  expectBalanced(snapshot)
-})
-
-test('physical specifications and Why explanations replace arbitrary capacity units', async ({ page }) => {
-  const state = sandbox(); state.paused = true
-  await openGame(page, state)
-  const cpu = page.getByTestId('equipment-card-cpu')
-  await expect(cpu).toContainText(/GHz/)
-  await cpu.getByText('Why?', { exact: true }).click()
-  await expect(cpu).toContainText(/cycles/i)
-  await expect(cpu).toContainText(/instructions/i)
-  await expect(page.getByTestId('equipment-card-memory')).toContainText(/GiB/)
-  await expect(page.getByTestId('equipment-card-ssd')).toContainText(/GiB/)
-  await expect(page.getByTestId('equipment-card-ssd')).toContainText(/IOPS/)
-  await expect(page.getByTestId('equipment-card-network')).toContainText(/Mbps|Gbps/)
-  await expect(page.locator('.app')).not.toContainText(/game minute|game min|permanent managed capacity/i)
-})
-
-test('linked views preserve selection and explain server parts and sampled service flow', async ({ page }) => {
-  const state = completeLab(); state.paused = true
-  await openGame(page, state)
-  await page.getByRole('button', { name: 'Server Interior', exact: true }).click()
-  await expect(page.locator('.app')).toContainText(/motherboard/i)
-  await expect(page.locator('.app')).toContainText(/power supply/i)
-  await page.getByRole('button', { name: /Select Memory|Inspect Memory|Inspect RAM/i }).click()
-  await expect(page.getByTestId('equipment-card-memory')).toHaveClass(/is-selected/)
-  await page.getByRole('button', { name: 'Service Flow', exact: true }).click()
-  await expect(page.locator('.app')).toContainText(/sample/i)
-  await expect(page.locator('.app')).toContainText(/shared.*data|shared.*storage/i)
-  await page.getByRole('button', { name: 'Workshop', exact: true }).click()
-  await expect(page.getByTestId('equipment-card-memory')).toHaveClass(/is-selected/)
-  await expect(page.locator('.billing-route')).toHaveCount(0)
-})
-
-test('technology notifications preserve manual pause without a modal', async ({ page }) => {
-  const state = sandbox(['cpu', 'memory', 'ssd']); state.paused = true
-  await openGame(page, state)
-  await page.getByRole('button', { name: /^Technology/ }).click()
-  await page.getByRole('button', { name: 'Unlock Virtualization', exact: true }).click()
-  await expect(page.getByRole('dialog')).toBeHidden()
-  await expect(page.getByTestId('live-alert')).toContainText(/Virtualization/i)
+  const dialog = page.getByRole('dialog')
+  await expect(dialog).toContainText('cloud')
   await page.clock.runFor(5_000)
-  const snapshot = await saveSnapshot(page)
-  expect(snapshot.paused).toBe(true); expect(snapshot.elapsed).toBe(state.elapsed)
-  expectBalanced(snapshot)
+  expect((await snapshot(page)).elapsed).toBe(0)
+  await page.getByRole('button', { name: /Open sandbox|Skip to sandbox/ }).click()
+  await expect(dialog).toBeHidden()
+  await expect(page.getByTestId('tuning-console')).toBeVisible()
 })
 
-test('incidents notify continuously while service and elapsed time keep advancing', async ({ page }) => {
-  let state = sandbox(['cpu', 'memory', 'ssd'])
-  state.nextIncidentAt = 0; state = triggerIncident(state, 'marketing')
-  await openGame(page, state)
-  await expect(page.getByRole('dialog')).toBeHidden()
-  await expect(page.getByTestId('live-alert')).toContainText(/viral|campaign/i)
-  await page.clock.runFor(10_000)
-  const snapshot = await saveSnapshot(page)
-  expect(snapshot.elapsed).toBeGreaterThan(state.elapsed + 9)
-  expect(snapshot.totalServed).toBeGreaterThan(state.totalServed)
-  expectBalanced(snapshot)
-})
-
-test('cash ledger reconciles completed revenue, purchases, and one-time rewards', async ({ page }) => {
-  const state = sandbox()
-  await openGame(page, state)
+test('a beginner completes live guided actions instead of a text banner', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 720 }); await openGame(page)
+  await page.getByRole('button', { name: /^Start tutorial/ }).click()
+  const coach = page.getByTestId('tutorial-coach')
+  await expect(coach).toBeVisible()
+  const before = await snapshot(page)
   await page.clock.runFor(2_000)
-  await page.getByRole('button', { name: 'Upgrade CPU', exact: true }).click()
-  const first = await saveSnapshot(page)
-  expect(first.revenue.gross).toBeGreaterThan(0)
-  expect(first.revenue.purchases).toBeGreaterThan(0)
-  expect(first.revenue.rewards).toBeGreaterThan(0)
-  expectBalanced(first)
-  await page.getByRole('button', { name: 'Finance', exact: true }).click()
-  const ledger = page.getByTestId('cash-ledger')
-  for (const label of ['Opening funds', 'Customer revenue', 'Rewards', 'Training grants', 'Equipment & technology', 'Operating expenses', 'Available funds']) await expect(ledger).toContainText(label)
-  await page.getByRole('button', { name: /Pause/ }).click()
-  const before = await saveSnapshot(page)
-  await page.reload(); await page.clock.runFor(3_000)
-  const after = await saveSnapshot(page)
-  expect(after.cash).toBe(before.cash)
-  expect(after.revenue.rewards).toBe(before.revenue.rewards)
-  expect(after.achievementIDs).toEqual(before.achievementIDs)
+  expect((await snapshot(page)).elapsed).toBeGreaterThan(before.elapsed)
+  await finishTutorial(page)
+  const s = await snapshot(page)
+  expect(s.tutorialComplete).toBe(true)
+  expect(s.upgrades).toEqual(expect.arrayContaining(['cpu', 'memory', 'ssd']))
+  expectBalanced(s)
+  await expect(page.locator('.tutorial-strip')).toHaveCount(0)
+  await expectViewportFit(page)
 })
 
-test('pause, speed and optional flow animations respond', async ({ page }) => {
+test('tutorial action reload resumes the task and skipping preserves the company', async ({ page }) => {
+  await openGame(page)
+  await page.getByRole('button', { name: /^Start tutorial/ }).click()
+  await page.getByRole('button', { name: 'Select Server 01', exact: true }).click()
+  const step = await page.getByTestId('tutorial-coach').getAttribute('data-step')
+  await snapshot(page); await page.reload()
+  await expect(page.getByTestId('tutorial-coach')).toHaveAttribute('data-step', step!)
+  await page.getByRole('button', { name: 'Skip tutorial', exact: true }).click()
+  await expect(page.getByTestId('tutorial-coach')).toBeHidden()
+  expectBalanced(await snapshot(page))
+})
+
+test('component choices focus the matching view and concise controls', async ({ page }) => {
+  const s = completeLab(); s.paused = true; await openGame(page, s)
+  for (const id of ['cpu', 'memory', 'ssd', 'network']) {
+    await selectComponent(page, id)
+    await expect(page.getByRole('button', { name: 'Server Interior', exact: true })).toHaveAttribute('aria-pressed', 'true')
+    await expect(page.getByTestId('tuning-console').getByLabel('Component')).toHaveValue(id)
+    const part = await page.locator(`.scene-viewport [data-component-id="${id}"]`).first().boundingBox()
+    const console = await page.getByTestId('tuning-console').boundingBox()
+    expect(part, 'Focused component remains present').not.toBeNull()
+    expect(part!.x).toBeGreaterThanOrEqual(0)
+    expect(part!.x + part!.width, 'Focused component stays beside the tuning console').toBeLessThanOrEqual(console!.x - 3)
+    if(id==='cpu'||id==='network')await page.screenshot({path:`test-results/cloudlab-compact-focused-${id}.png`})
+  }
+  await expect(page.getByTestId('tuning-console')).toContainText(/Mbps|Gbps/)
+  await expect(page.getByTestId('tuning-console')).not.toContainText(/instructions per cycle|assumed 256|requests\/second/)
+  for (const id of ['cloud', 'ai']) {
+    await selectComponent(page, id)
+    await expect(page.getByRole('button', { name: 'Service Flow', exact: true })).toHaveAttribute('aria-pressed', 'true')
+  }
+})
+
+test('scene clicks select their controls without leaving the current view', async ({ page }) => {
+  const s = completeLab(); s.paused = true; await openGame(page, s)
+  await page.getByRole('button', { name: 'Server Interior', exact: true }).click()
+  await page.getByRole('button', { name: 'Inspect RAM', exact: true }).click()
+  await expect(page.getByTestId('tuning-console').getByLabel('Component')).toHaveValue('memory')
+  await page.getByRole('button', { name: 'Service Flow', exact: true }).click()
+  await page.locator('[data-component-id="network"]').first().click()
+  await expect(page.getByRole('button', { name: 'Service Flow', exact: true })).toHaveAttribute('aria-pressed', 'true')
+  await expect(page.getByTestId('tuning-console').getByLabel('Component')).toHaveValue('network')
+  await page.getByRole('button', { name: 'Workshop', exact: true }).click()
+  await expect(page.getByTestId('tuning-console').getByLabel('Component')).toHaveValue('network')
+})
+
+test('keyboard exploration reframes parts without buying or changing the tuning selection', async ({ page }) => {
+  const s=sandbox();s.paused=true;await openGame(page,s)
+  await selectComponent(page,'cpu')
+  await page.getByRole('button',{name:'Inspect CPU',exact:true}).focus()
+  await page.keyboard.press('Tab');await page.clock.runFor(450)
+  await expect(page.getByRole('button',{name:'Inspect RAM',exact:true})).toBeFocused()
+  await expect(page.getByTestId('tuning-console').getByLabel('Component')).toHaveValue('cpu')
+  const part=await page.locator('.scene-viewport [data-component-id="memory"]').boundingBox()
+  const console=await page.getByTestId('tuning-console').boundingBox()
+  expect(part!.x).toBeGreaterThanOrEqual(0)
+  expect(part!.x+part!.width).toBeLessThanOrEqual(console!.x-3)
+  expect((await snapshot(page)).revenue.purchases).toBe(s.revenue.purchases)
+})
+
+test('missing Storage (SSD) prerequisite leads directly to its upgrade', async ({ page }) => {
+  const s = sandbox(['cpu', 'memory']); s.paused = true; await openGame(page, s)
+  await selectComponent(page, 'virtualization', 'Technology')
+  const console = page.getByTestId('tuning-console')
+  await console.getByRole('button', { name: /^Upgrade Storage \(SSD\)/ }).click()
+  await expect(console.getByLabel('Component')).toHaveValue('ssd')
+  await expect(page.getByRole('button', { name: 'Server Interior', exact: true })).toHaveAttribute('aria-pressed', 'true')
+  await console.getByRole('button', { name: 'Upgrade Storage (SSD)', exact: true }).click()
+  await selectComponent(page, 'virtualization', 'Technology')
+  await expect(console.getByRole('button', { name: 'Unlock Virtualization', exact: true })).toBeEnabled()
+})
+
+test('all technologies are reachable through the selected-component console', async ({ page }) => {
+  const s = sandbox(); s.paused = true; await openGame(page, s)
+  for (const [id, name] of [['cpu', 'CPU'], ['memory', 'Memory'], ['ssd', 'Storage (SSD)']] as const) {
+    await selectComponent(page, id)
+    await page.getByTestId('tuning-console').getByRole('button', { name: `Upgrade ${name}`, exact: true }).click()
+  }
+  for (const upgrade of UPGRADES.filter(u => !['cpu', 'memory', 'ssd'].includes(u.id))) {
+    await selectComponent(page, upgrade.id, 'Technology')
+    const button = page.getByTestId('tuning-console').getByRole('button', { name: `Unlock ${upgrade.name}`, exact: true })
+    await expect(button).toBeEnabled()
+    await button.click()
+    await expect(page.getByTestId('major-announcement')).toBeVisible()
+    await continueMajor(page)
+  }
+  const state = await snapshot(page)
+  expect(state.upgrades).toHaveLength(12)
+  expectBalanced(state)
+})
+
+test('upgrade feedback follows the selected component in every view', async ({ page }) => {
+  const s = sandbox(); s.paused = true; await openGame(page, s)
+  for (const view of ['Workshop', 'Server Interior', 'Service Flow']) {
+    await page.getByRole('button', { name: view, exact: true }).click()
+    await page.getByTestId('tuning-console').getByRole('button', { name: 'Upgrade CPU', exact: true }).click()
+    const feedback = page.getByTestId('purchase-feedback')
+    await expect(feedback).toBeVisible()
+    await expect(feedback).toContainText(/LV/)
+    await expect(feedback).toContainText(/→/)
+    await expect(page.getByRole('button', { name: view, exact: true })).toHaveAttribute('aria-pressed', 'true')
+  }
+  expect((await snapshot(page)).equipmentLevels.cpu).toBe(3)
+})
+
+test('rapid purchases retain the newest level and physical specification feedback', async ({ page }) => {
+  const s = sandbox(); s.paused = true; await openGame(page, s)
+  await selectComponent(page, 'network')
+  const button = page.getByTestId('tuning-console').getByRole('button', { name: 'Upgrade Network', exact: true })
+  await button.click(); await page.clock.runFor(400); await button.click()
+  await expect(page.getByTestId('purchase-feedback')).toContainText('2')
+  await expect(page.getByTestId('purchase-feedback')).toContainText(/500 Mbps/)
+  await page.clock.runFor(700)
+  await expect(page.getByTestId('purchase-feedback')).toBeVisible()
+  const state = await snapshot(page)
+  expect(state.equipmentLevels.network).toBe(2); expectBalanced(state)
+})
+
+test('unaffordable actions explain the shortfall without successful feedback', async ({ page }) => {
+  const s = fund(sandbox(), 0); s.paused = true; await openGame(page, s)
+  const console = page.getByTestId('tuning-console')
+  await expect(console.getByRole('button', { name: 'Upgrade CPU', exact: true })).toBeDisabled()
+  await expect(console).toContainText(/Need|Short/)
+  await expect(page.getByTestId('purchase-feedback')).toBeHidden()
+})
+
+test('the tuning console collapses and reopens without losing its selection', async ({ page }) => {
+  const s = sandbox(); s.paused = true; await openGame(page, s)
+  await selectComponent(page, 'memory')
+  await page.getByRole('button', { name: 'Collapse tuning console', exact: true }).click()
+  await expect(page.getByTestId('tuning-console')).toBeHidden()
+  await page.getByRole('button', { name: /^Tune components/ }).click()
+  await expect(page.getByTestId('tuning-console').getByLabel('Component')).toHaveValue('memory')
+})
+
+test('Hint shows a short constraint and navigates to the suggested component', async ({ page }) => {
+  const s = sandbox(); s.paused = true; await openGame(page, s)
+  await page.getByRole('button', { name: 'Hint', exact: true }).click()
+  const hint = page.getByTestId('hint-popover')
+  await expect(hint).toContainText(/CPU|processor/i)
+  await expect(hint).toContainText(/keep up|slow|upgrade/i)
+  await hint.getByRole('button', { name: /^Inspect upgrade/ }).click()
+  await expect(page.getByTestId('tuning-console').getByLabel('Component')).toHaveValue('cpu')
+  await expect(page.getByRole('button', { name: 'Server Interior', exact: true })).toHaveAttribute('aria-pressed', 'true')
+})
+
+test('healthy service gives reassurance without inventing an urgent purchase', async ({ page }) => {
+  const s = sandbox(['cpu']); s.paused = true; s.reputation = 60; s.totalServed = 0; s.metrics = calculateMetrics(s)
+  await openGame(page, s)
+  await page.getByRole('button', { name: 'Hint', exact: true }).click()
+  const hint = page.getByTestId('hint-popover')
+  await expect(hint).toContainText('Everything is working well')
+  await expect(hint.getByRole('button', { name: /^Inspect upgrade/ })).toBeHidden()
+})
+
+test('technology acquisition is a short popup and preserves a manual pause', async ({ page }) => {
+  const s = sandbox(['cpu', 'memory', 'ssd']); s.paused = true; await openGame(page, s)
+  await selectComponent(page, 'virtualization', 'Technology')
+  await page.getByRole('button', { name: 'Unlock Virtualization', exact: true }).click()
+  const dialog = page.getByTestId('major-announcement')
+  await expect(dialog).toContainText(/Acquired.*Virtualization/i)
+  const before = await snapshot(page); await page.clock.runFor(5_000)
+  expect((await snapshot(page)).elapsed).toBe(before.elapsed)
+  await dialog.getByRole('button', { name: /^Continue/ }).click()
+  expect((await snapshot(page)).paused).toBe(true)
+  await expectViewportFit(page)
+})
+
+test('incident start and summary pause reading time and report net results', async ({ page }) => {
+  let s = sandbox(); s.nextIncidentAt = 0; s = triggerIncident(s, 'marketing'); await openGame(page, s)
+  const notice = page.getByTestId('major-announcement')
+  await expect(notice).toContainText(/viral|campaign/i)
+  await expect(notice).toContainText(/25.*minutes/)
+  const before = await snapshot(page); await page.clock.runFor(5_000)
+  expect((await snapshot(page)).elapsed).toBe(before.elapsed)
+  await continueMajor(page); await page.clock.runFor(27_000)
+  const report = page.getByTestId('event-summary')
+  await expect(report).toBeVisible()
+  await expect(report).toContainText(/profit|loss/i)
+  await expect(report).toContainText(/served/i)
+  const finished = await snapshot(page)
+  expect(finished.eventReports[0].duration).toBeCloseTo(25)
+  expect(finished.elapsed).toBeCloseTo(before.elapsed + 25)
+  await page.clock.runFor(4_000)
+  expect((await snapshot(page)).cash).toBe(finished.cash)
+  await continueMajor(page); await page.clock.runFor(1_000)
+  expect((await snapshot(page)).elapsed).toBeGreaterThan(finished.elapsed)
+  expectBalanced(await snapshot(page))
+})
+
+test('legacy pending alerts are archived rather than replayed as a backlog', async ({ page }) => {
+  let s = sandbox(['cpu', 'memory', 'ssd']); s = purchaseUpgrade(s, 'virtualization'); s.paused = true
+  const legacy = JSON.parse(serializeGame(s)); delete legacy.uiRevision
+  await openGame(page, JSON.stringify(legacy))
+  await expect(page.getByTestId('major-announcement')).toBeHidden()
+  const restored = await snapshot(page)
+  expect(restored.cash).toBe(s.cash); expect(restored.upgrades).toEqual(s.upgrades)
+  expectBalanced(restored)
+})
+
+test('profit badge uses net operating profit and the funds counter has stable dimensions', async ({ page }) => {
+  const s = fund(sandbox(), 95); await openGame(page, s)
+  const cash = page.getByTestId('cash-display'), badge = page.getByTestId('profit-badge')
+  const before = await cash.boundingBox()
+  await expect(badge).toContainText(/Profit.*\+/i)
+  await page.clock.runFor(3_000)
+  const after = await cash.boundingBox()
+  expect(after!.width).toBeCloseTo(before!.width, 1)
+  expect(after!.height).toBeCloseTo(before!.height, 1)
+  await expect(page.locator('.earning-burst')).toHaveCount(0)
+  await expect(badge).toContainText('/min')
+  expectBalanced(await snapshot(page))
+})
+
+test('zero completed requests still show a red operating loss', async ({ page }) => {
+  let s = sandbox(['cpu', 'memory', 'ssd', 'virtualization']); s.nextIncidentAt = 0
+  s = acknowledgeAll(triggerIncident(s, 'hardware')); s.nextIncidentAt = 1_000_000
+  expect(calculateMetrics(s).served).toBe(0)
+  await openGame(page, s)
+  const badge = page.getByTestId('profit-badge')
+  await expect(badge).toContainText(/Profit.*[−-]/i)
+  const color = await badge.evaluate(node => getComputedStyle(node).color)
+  const channels = color.match(/[\d.]+/g)!.map(Number)
+  expect(channels[0]).toBeGreaterThan(channels[1])
+  await page.clock.runFor(1_000)
+  const after = await snapshot(page)
+  expect(after.cash).toBeLessThan(s.cash); expectBalanced(after)
+})
+
+test('purchase deductions are immediate and rewards do not become operating profit', async ({ page }) => {
+  const s = sandbox(); s.paused = true; await openGame(page, s)
+  const badge = page.getByTestId('profit-badge'), before = await badge.innerText()
+  await selectComponent(page, 'memory')
+  await page.getByRole('button', { name: 'Upgrade Memory', exact: true }).click()
+  const after = await snapshot(page)
+  expect(after.revenue.purchases).toBe(220)
+  expect(after.revenue.rewards).toBeGreaterThan(0)
+  expect(after.revenue.gross).toBe(0)
+  expect(after.metrics.net).toBe(s.metrics.net)
+  await expect(badge).toHaveText(before)
+  expectBalanced(after)
+})
+
+test('rented resources show startup before capacity becomes available', async ({ page }) => {
+  const s = completeLab(); await openGame(page, s)
+  await selectComponent(page, 'cloud')
+  const before = await snapshot(page)
+  await page.getByRole('button', { name: 'Upgrade Cloud capacity', exact: true }).click()
+  await expect(page.getByTestId('tuning-console')).toContainText(/Starting|provision/i)
+  expect((await snapshot(page)).cloudProvisioned).toBe(before.cloudProvisioned)
+  await page.clock.runFor(2_500)
+  expect((await snapshot(page)).cloudProvisioned).toBeGreaterThan(before.cloudProvisioned)
+})
+
+test('pause, speed and settings controls preserve the compact playfield', async ({ page }) => {
   await openGame(page, sandbox())
   await page.getByRole('button', { name: /Pause/ }).click()
-  const before = await saveSnapshot(page); await page.clock.runFor(3_000)
-  const after = await saveSnapshot(page); expect(after.cash).toBe(before.cash)
+  const paused = await snapshot(page); await page.clock.runFor(3_000)
+  expect((await snapshot(page)).cash).toBe(paused.cash)
   await page.getByRole('button', { name: /Resume/ }).click()
   await page.getByRole('button', { name: '4×', exact: true }).click()
   await page.clock.runFor(1_000)
-  expect((await saveSnapshot(page)).elapsed - after.elapsed).toBeGreaterThan(3.5)
-  await page.getByRole('button', { name: /Flow off/i }).click()
-  await expect(page.getByRole('button', { name: /Flow on/i })).toBeVisible()
+  expect((await snapshot(page)).elapsed).toBeGreaterThan(paused.elapsed + 3.5)
+  await utility(page, 'Settings')
+  await page.getByRole('button', { name: 'Motion on', exact: true }).click()
+  await expect(page.locator('.compact-app')).toHaveClass(/reduced-motion/)
+  await expectViewportFit(page)
 })
 
-test('policies retain cooldowns and rented resources can be stopped and resumed', async ({ page }) => {
+test('Finance remains accurate in a compact overlay and Escape returns focus', async ({ page }) => {
   await openGame(page, completeLab())
-  await page.getByRole('button', { name: 'Operations', exact: true }).click()
-  await page.getByRole('button', { name: 'Firewall strict', exact: true }).click()
-  await expect(page.getByRole('button', { name: 'Firewall balanced', exact: true })).toBeDisabled()
-  await page.clock.runFor(11_000)
-  await expect(page.getByRole('button', { name: 'Firewall balanced', exact: true })).toBeEnabled()
-  await page.getByRole('button', { name: 'Stop rentals', exact: true }).click()
-  let snapshot = await saveSnapshot(page)
-  expect(snapshot.rentalsEnabled).toBe(false)
-  expect(snapshot.metrics.cloud).toBe(0)
-  const stoppedExpense = snapshot.metrics.expenses
-  await page.getByRole('button', { name: 'Resume rentals', exact: true }).click()
-  await page.clock.runFor(4_000)
-  snapshot = await saveSnapshot(page)
-  expect(snapshot.rentalsEnabled).toBe(true)
-  expect(snapshot.metrics.expenses).toBeGreaterThan(stoppedExpense)
-})
-
-test('v4 migration preserves the company and keeps a recoverable backup', async ({ page }) => {
-  const state = sandbox(['cpu', 'memory', 'ssd']); state.paused = true
-  const legacy = { ...state, version: 4, cash: 4321 }
-  await openGame(page, JSON.stringify(legacy)); await page.clock.runFor(10_000)
-  const snapshot = await saveSnapshot(page)
-  expect(snapshot.version).toBe(5); expect(snapshot.cash).toBe(4321)
-  expect(snapshot.upgrades).toEqual(expect.arrayContaining(['cpu', 'memory', 'ssd']))
-  expect(snapshot.paused).toBe(true); expectBalanced(snapshot)
-  await page.getByRole('button', { name: /^Save$/i }).click()
-  await expect(page.getByRole('button', { name: 'Load pre-migration backup', exact: true })).toBeVisible()
-})
-
-test('invalid imports preserve the company and dialogs support Escape', async ({ page }) => {
-  await openGame(page, sandbox(['cpu']))
-  await page.getByRole('button', { name: /^Save$/i }).click()
+  await utility(page, 'Finance')
   const dialog = page.getByRole('dialog')
-  await page.getByLabel('Save data').fill('{"version":5,"cash":0,"equipmentLevels":{"cpu":-4}}')
-  await page.getByRole('button', { name: 'Import save', exact: true }).click()
-  await expect(dialog).toContainText(/invalid|incompatible/i)
+  for (const name of ['Customer revenue', 'Operating expenses', 'Available funds']) await expect(dialog).toContainText(name)
+  await expectViewportFit(page)
   await page.keyboard.press('Escape'); await expect(dialog).toBeHidden()
-  expect((await saveSnapshot(page)).upgrades).toContain('cpu')
+  await expect(page.getByRole('button',{name:'Menu',exact:true})).toBeFocused()
+  expectBalanced(await snapshot(page))
 })
 
-test('tutorial replay preserves live finances and achievements', async ({ page }) => {
-  const state = completeLab(); state.paused = true
-  await openGame(page, state)
-  const before = await saveSnapshot(page)
-  await page.getByRole('button', { name: 'Help', exact: true }).click()
+test('Save exports valid snapshots and invalid imports leave the company unchanged', async ({ page }) => {
+  const s = sandbox(['cpu']); s.paused = true; await openGame(page, s)
+  await utility(page, 'Save')
+  const exported = page.waitForEvent('download')
+  await page.getByRole('button', { name: 'Export save', exact: true }).click()
+  const path = await (await exported).path()
+  expect(path).not.toBeNull()
+  const saved = JSON.parse(await readFile(path!, 'utf8')) as GameState
+  expect(saved.upgrades).toContain('cpu'); expectBalanced(saved)
+  await page.getByLabel('Import save file', { exact: true }).setInputFiles({name:'invalid.json',mimeType:'application/json',buffer:Buffer.from('{"version":5,"cash":0}')})
+  await expect(page.getByRole('dialog')).toContainText(/invalid/i)
+  await page.keyboard.press('Escape')
+  expect((await snapshot(page)).cash).toBe(s.cash)
+})
+
+test('tutorial replay preserves live finances, achievements, and the manual pause', async ({ page }) => {
+  const s = completeLab(); s.paused = true; await openGame(page, s)
+  const before = await snapshot(page)
+  await utility(page, 'Help')
   await page.getByRole('button', { name: 'Replay tutorial', exact: true }).click()
-  await page.clock.runFor(3_000)
-  const training = await saveSnapshot(page)
-  expect(training.cash).toBe(before.cash)
-  expect(training.revenue).toEqual(before.revenue)
-  expect(training.achievementIDs).toEqual(before.achievementIDs)
+  await page.clock.runFor(2_000)
+  const replay = await snapshot(page)
+  expect(replay.cash).toBe(before.cash); expect(replay.revenue).toEqual(before.revenue)
+  expect(replay.achievementIDs).toEqual(before.achievementIDs)
   await page.getByRole('button', { name: 'Skip tutorial', exact: true }).click()
-  await expect(page.getByRole('dialog')).toBeHidden()
+  expect((await snapshot(page)).paused).toBe(before.paused)
 })
 
-test('a prepared company passes Launch Day and an underprepared company can retry', async ({ page }) => {
-  let state = completeLab(); state.reputation = 90
-  for (const id of ['cpu', 'memory', 'ssd', 'network', 'cloud', 'ai'] as const) {
-    for (let i = 0; i < 5; i++) state = purchaseEquipment(state, id)
-  }
-  state = acknowledgeAll(state)
-  for (let i = 0; i < 200; i++) state = acknowledgeAll(stepGame(state, .25))
-  state.incident = null; state.nextIncidentAt = 1_000_000
-  await openGame(page, state)
-  await page.getByRole('button', { name: 'Operations', exact: true }).click()
-  await page.getByRole('button', { name: 'Start Launch Day', exact: true }).click()
-  await page.getByRole('button', { name: 'Close details', exact: true }).click()
-  await page.clock.runFor(92_000)
-  expect((await saveSnapshot(page)).challenge.result).toBe('passed')
-  const failing = completeLab(); failing.reputation = 10
-  const active = acknowledgeAll(startChallenge(failing))
-  await page.getByRole('button', { name: /^Save$/i }).click()
-  await page.getByLabel('Save data').fill(serializeGame(active))
-  await page.getByRole('button', { name: 'Import save', exact: true }).click()
-  await page.clock.runFor(92_000)
-  expect((await saveSnapshot(page)).challenge.result).toBe('failed')
-  await page.clock.runFor(32_000)
-  await page.getByRole('button', { name: 'Operations', exact: true }).click()
-  await expect(page.getByRole('button', { name: 'Start Launch Day', exact: true })).toBeEnabled()
-})
-
-test('measured event reports remain inspectable without stopping ordinary play', async ({ page }) => {
-  let state = sandbox(); state.nextIncidentAt = 0
-  state = triggerIncident(state, 'marketing')
-  await openGame(page, state); await page.clock.runFor(27_000)
-  await expect(page.getByRole('dialog')).toBeHidden()
-  const running = await saveSnapshot(page)
-  expect(running.eventReports).toHaveLength(1)
-  expect(running.eventReports[0].duration).toBeCloseTo(25)
-  await page.getByRole('button', { name: 'Events', exact: true }).click()
-  await page.locator('.event-report-list').getByRole('button').first().click()
-  await expect(page.getByTestId('event-report')).toContainText('Potential gross earnings')
-  await expect(page.getByTestId('event-report')).not.toContainText('game minute')
-  await page.clock.runFor(5_000)
-  await page.getByRole('dialog').getByRole('button', { name: 'Continue', exact: true }).click()
-  expect((await saveSnapshot(page)).elapsed).toBeCloseTo(running.elapsed, 1)
+test('hidden pages do not earn offline revenue', async ({ page }) => {
+  await openGame(page, sandbox()); const before = await snapshot(page)
+  await page.evaluate(() => {Object.defineProperty(document,'hidden',{configurable:true,get:()=>true});document.dispatchEvent(new Event('visibilitychange'))})
+  await page.clock.runFor(10_000)
+  const hidden = await snapshot(page)
+  expect(hidden.cash).toBeCloseTo(before.cash, 1); expect(hidden.elapsed).toBeCloseTo(before.elapsed, 1)
+  await page.evaluate(() => {Object.defineProperty(document,'hidden',{configurable:true,get:()=>false});document.dispatchEvent(new Event('visibilitychange'))})
   await page.clock.runFor(1_000)
-  expect((await saveSnapshot(page)).elapsed).toBeGreaterThan(running.elapsed)
+  expect((await snapshot(page)).elapsed).toBeGreaterThan(hidden.elapsed)
 })
 
-test('billing terminal follows customer gross revenue and stops during pauses and purchases', async ({ page }) => {
-  await openGame(page, sandbox(['cpu', 'memory', 'ssd']))
-  await page.clock.runFor(2_000)
-  const meter = page.getByTestId('billing-earnings')
-  const displayed = Number(await meter.getAttribute('data-total'))
-  expect(displayed).toBeGreaterThan(0)
-  await page.getByRole('button', { name: /Pause/ }).click()
-  const snapshot = await saveSnapshot(page)
-  expect(displayed).toBeLessThanOrEqual(snapshot.revenue.gross + .01)
-  const stopped = await meter.getAttribute('data-total')
-  await page.clock.runFor(3_000)
-  await page.getByRole('button', { name: 'Upgrade CPU', exact: true }).click()
-  await page.clock.runFor(2_000)
-  await expect(meter).toHaveAttribute('data-total', stopped!)
-  expect((await saveSnapshot(page)).revenue.gross).toBe(snapshot.revenue.gross)
-})
-
-for (const viewport of [{ width: 1024, height: 700 }, { width: 1280, height: 800 }, { width: 1440, height: 900 }]) {
-  test(`desktop ${viewport.width}px keeps workshop, toolbar and upgrade tray inside the viewport`, async ({ page }) => {
-    await page.setViewportSize(viewport); await openGame(page, completeLab())
-    await expect(page.getByRole('button', { name: 'Upgrade CPU', exact: true })).toBeVisible()
-    const bounds = await page.evaluate(() => ({ inner: innerWidth, content: document.documentElement.scrollWidth }))
-    expect(bounds.content).toBeLessThanOrEqual(bounds.inner)
-    await expect(page.getByTestId('milestone-strip')).toBeVisible()
-    await page.getByRole('button', { name: 'Motion on', exact: true }).click()
-    await expect(page.locator('.app')).toHaveClass(/reduced-motion/)
-    await page.screenshot({ path: `test-results/cloudlab-${viewport.width}.png` })
+for (const viewport of [{width:780,height:600},{width:1024,height:600},{width:1280,height:720},{width:1440,height:900},{width:1920,height:1080}]) {
+  test(`desktop ${viewport.width}×${viewport.height} keeps views and overlays inside the viewport`, async ({ page }) => {
+    await page.setViewportSize(viewport)
+    const s = completeLab(); s.paused = true; await openGame(page, s)
+    for (const view of ['Workshop','Server Interior','Service Flow']) {
+      await page.getByRole('button',{name:view,exact:true}).click()
+      await page.screenshot({path:`test-results/cloudlab-compact-${viewport.width}-${view.toLowerCase().replaceAll(' ','-')}.png`})
+      await expectViewportFit(page)
+      await expect(page.getByTestId('tuning-console').getByRole('button',{name:'Upgrade CPU',exact:true})).toBeVisible()
+    }
+    await page.getByRole('button',{name:'Workshop',exact:true}).click()
+    await page.screenshot({path:`test-results/cloudlab-compact-${viewport.width}.png`})
+    for (const name of ['Finance','Operations','Achievements','Events','Help','Save','Settings']) {
+      await utility(page,name); await expectViewportFit(page)
+      await page.getByRole('dialog').getByRole('button',{name:'Close',exact:true}).click()
+    }
   })
 }
 
-test('facility eras and linked views keep pixel graphics and controls readable', async ({ page }) => {
-  await page.setViewportSize({width:1440,height:1000})
-  const first=sandbox();first.paused=true
-  await openGame(page,first)
-  await page.screenshot({path:'test-results/cloudlab-workshop.png'})
-  for(const [era,until] of [['rooftop','load_balancer'],['datacenter','autoscaling'],['ai','ai']] as const){
-    const end=UPGRADES.findIndex(u=>u.id===until)
-    const state=sandbox(UPGRADES.slice(0,end+1).map(u=>u.id));state.paused=true
-    await page.getByRole('button',{name:/^Save$/i}).click()
-    await page.getByLabel('Save data').fill(serializeGame(state))
-    await page.getByRole('button',{name:'Import save',exact:true}).click()
-    await expect(page.locator('.workshop-stage')).toHaveAttribute('data-era',era)
-    await page.screenshot({path:`test-results/cloudlab-${era}.png`})
-  }
-  for(const view of ['Server Interior','Service Flow'] as const){
-    await page.getByRole('button',{name:view,exact:true}).click()
-    await page.screenshot({path:`test-results/cloudlab-${view==='Server Interior'?'interior':'flow'}.png`,fullPage:true})
-  }
-  const node=page.getByRole('button',{name:'Inspect SHARED DATA',exact:true})
-  await node.press('Enter')
-  await expect(page.locator('.component-inspector')).toContainText('Shared data service')
-  await page.getByRole('button',{name:'Finance',exact:true}).click()
-  await expect(page.getByTestId('cash-ledger')).toBeVisible()
+
+test('maximum Storage (SSD) specifications and funding notes fit a compact console',async({page})=>{
+  await page.setViewportSize({width:780,height:600})
+  let s=sandbox();s=purchaseEquipment(s,'ssd','max');s.paused=true
+  await openGame(page,s);await selectComponent(page,'ssd')
+  await expect(page.getByTestId('tuning-console')).toContainText(/16,384/)
+  await expectViewportFit(page)
+  await page.screenshot({path:'test-results/cloudlab-compact-max-storage.png'})
 })
 
-test('hidden pages freeze service and compact windows retain the pixel theme',async({page})=>{
-  await page.setViewportSize({width:780,height:900})
-  await openGame(page,sandbox())
-  const before=await saveSnapshot(page)
-  await page.evaluate(()=>{Object.defineProperty(document,'hidden',{configurable:true,get:()=>true});document.dispatchEvent(new Event('visibilitychange'))})
-  await page.clock.runFor(10_000)
-  const hidden=await saveSnapshot(page)
-  expect(hidden.elapsed).toBeCloseTo(before.elapsed,1)
-  expect(hidden.cash).toBeCloseTo(before.cash,1)
-  await page.evaluate(()=>{Object.defineProperty(document,'hidden',{configurable:true,get:()=>false});document.dispatchEvent(new Event('visibilitychange'))})
-  await page.clock.runFor(1_000)
-  expect((await saveSnapshot(page)).elapsed).toBeGreaterThan(hidden.elapsed)
-  expect(await page.evaluate(()=>document.documentElement.scrollWidth)).toBeLessThanOrEqual(780)
-  expect(await page.locator('.machine-tag text').first().evaluate(node=>getComputedStyle(node).fontFamily)).toContain('CloudPixelBody')
-  await page.getByRole('button',{name:'Motion on',exact:true}).click()
-  await expect(page.locator('.app')).toHaveClass(/reduced-motion/)
+
+test('all locked technology and equipment cards fit the smallest desktop window',async({page})=>{
+  await page.setViewportSize({width:780,height:600})
+  const s=sandbox();s.paused=true;await openGame(page,s)
+  for(const id of ['cpu','memory','ssd','network','cloud','ai']){
+    await selectComponent(page,id)
+    await expectViewportFit(page)
+  }
+  for(const item of UPGRADES.filter(u=>!['cpu','memory','ssd'].includes(u.id))){
+    await selectComponent(page,item.id,'Technology')
+    await expectViewportFit(page)
+  }
 })

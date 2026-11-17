@@ -6,8 +6,8 @@ import { emptyEventStats, integrateEvent, EVENT_STORIES, STAGES, TECHNOLOGY_TIPS
 
 export const EQUIPMENT: EquipmentDefinition[] = [
   {id:'cpu',name:'CPU Module',baseCost:80,increase:3},
-  {id:'memory',name:'Memory Bank',baseCost:220,increase:4},
-  {id:'ssd',name:'SSD Array',baseCost:400,increase:7},
+  {id:'memory',name:'Memory',baseCost:220,increase:4},
+  {id:'ssd',name:'Storage (SSD)',baseCost:400,increase:7},
   {id:'network',name:'Network Uplink',baseCost:180,increase:4},
   {id:'cloud',name:'Cloud Capacity',baseCost:800,increase:6,unlock:'cloud'},
   {id:'ai',name:'AI Compute',baseCost:1200,increase:4,unlock:'ai'},
@@ -79,6 +79,10 @@ export const getEquipmentQuote = (s: GameState, id: EquipmentId, quantity: 1 | '
   const item = equipmentById[id]
   if (!item) return {count:0,cost:0,increase:0,nextCost:0,available:false,reason:'Unknown equipment'}
   const nextCost = equipmentPrice(id,s.equipmentLevels[id])
+  if(s.tutorial.status==='active' && s.tutorial.replay){
+    const available=s.tutorial.phase==='action'&&getTutorialLesson(s).requiredUpgrade===id
+    return {count:available?1:0,cost:0,increase:available?item.increase:0,nextCost:0,available,reason:available?'Training upgrade — no charge':'Follow the highlighted tutorial action.'}
+  }
   if(s.equipmentLevels[id]>=MAX_LEVELS[id])return {count:0,cost:nextCost,increase:0,nextCost,available:false,reason:'Maximum hardware tier reached; expand the service instead.'}
   const locked = item.unlock && !owned(s,item.unlock) ? `Unlock ${upgradeById[item.unlock].name} first.` : ''
   const guided = training(s) && (s.tutorial.phase !== 'action' || getTutorialLesson(s).requiredUpgrade !== id || s.equipmentLevels[id] > 0) ? 'Follow the highlighted tutorial action, or skip to Open Lab.' : ''
@@ -92,6 +96,12 @@ export const purchaseEquipment = (state: GameState, id: EquipmentId, quantity: 1
   const quote = getEquipmentQuote(state,id,quantity)
   if (!quote.available) return state
   const s = structuredClone(state)
+  if(s.tutorial.status==='active'&&s.tutorial.replay){
+    moveTutorial(s,s.tutorial.step+1)
+    s.metrics=calculateMetrics(s)
+    s.lastPurchase={id,at:s.elapsed,before:calculateMetrics(state),after:s.metrics,beforeLevel:0,afterLevel:1,quantity:1,cost:0}
+    return s
+  }
   s.cash -= quote.cost; s.revenue.purchases += quote.cost; s.equipmentLevels[id] += quote.count
   if (id !== 'network' && !owned(s,id)) { s.upgrades.push(id); s.upgradeTimes[id] = s.elapsed }
   if ((id === 'cloud' || id === 'ai') && s.rentalsEnabled) {
@@ -99,14 +109,20 @@ export const purchaseEquipment = (state: GameState, id: EquipmentId, quantity: 1
   }
   if (id === 'ssd' && s.equipmentLevels.ssd === 1 && !training(s)) queueIncident(s,'marketing')
   addLog(s,`${equipmentById[id].name}: ${quote.count} upgrade${quote.count===1?'':'s'} installed${id==='cloud'||id==='ai'?'; rental capacity starts in 2 minutes':''}.`, 'good')
-  if (training(s)) { s.tutorial.phase = 'demo'; s.tutorial.demoRemaining = 4; s.paused = false }
+  if (training(s)) moveTutorial(s,s.tutorial.step+1)
   else awardAchievements(s)
   s.metrics = calculateMetrics(s)
-  s.lastPurchase = {id,at:s.elapsed,before:calculateMetrics(state),after:s.metrics}
+  s.lastPurchase = {id,at:s.elapsed,before:calculateMetrics(state),after:s.metrics,beforeLevel:state.equipmentLevels[id],afterLevel:s.equipmentLevels[id],quantity:quote.count,cost:quote.cost}
   return s
 }
 
 export const previewEquipmentImpact = (state:GameState,id:EquipmentId,count=1) => {
+  if(state.tutorial.status==='active'&&state.tutorial.replay){
+    const before=calculateMetrics(state)
+    if(getTutorialLesson(state).requiredUpgrade!==id)return {id,at:state.elapsed,before,after:before}
+    const next=structuredClone(state);moveTutorial(next,next.tutorial.step+1)
+    return {id,at:state.elapsed,before,after:calculateMetrics(next)}
+  }
   const s={...state,equipmentLevels:{...state.equipmentLevels,[id]:Math.min(MAX_LEVELS[id],state.equipmentLevels[id]+count)},upgrades:[...state.upgrades]}
   if(id!=='network'&&!owned(s,id))s.upgrades.push(id)
   if(id==='cloud'&&s.rentalsEnabled)s.cloudProvisioned=Math.min(8,Math.max(s.cloudProvisioned,s.provisioning.target)+Math.min(count,MAX_LEVELS[id]-state.equipmentLevels[id]))
@@ -116,7 +132,7 @@ export const previewEquipmentImpact = (state:GameState,id:EquipmentId,count=1) =
 
 export const createInitialState = (): GameState => {
   const state: GameState = {
-    version: 5, storageUsedGiB:32,rentalsEnabled:true,provisioning:{target:0,gpuTarget:0,remaining:0}, revenue:{opening:25,gross:0,expenses:0,grants:0,rewards:0,purchases:0},lastPurchase:null,eventReports:[], cash: 25, reputation: 60, elapsed: 0, totalServed: 0, paused: true, speed: 1,
+    version: 5, uiRevision:2, storageUsedGiB:32,rentalsEnabled:true,provisioning:{target:0,gpuTarget:0,remaining:0}, revenue:{opening:25,gross:0,expenses:0,grants:0,rewards:0,purchases:0},lastPurchase:null,eventReports:[], cash: 25, reputation: 60, elapsed: 0, totalServed: 0, paused: true, speed: 1,
     equipmentLevels: {cpu:0,memory:0,ssd:0,network:0,cloud:0,ai:0}, aiServed:0,stableServiceMinutes:0,incidentsRecovered:0,achievementIDs:[],announcements:[],acknowledgedAnnouncements:[],announcementSequence:0,
     upgrades: [], policies: { loadBalancer: 'efficiency', firewall: 'balanced', autoscaling: 'economy' },
     policyCooldownUntil: 0, tutorialStep: 0, tutorialComplete: false,
@@ -150,7 +166,7 @@ export const getEffectiveUpgrades = (s: GameState): UpgradeId[] => {
 
 export const calculateMetrics = (state: GameState): Metrics => {
   const effective=getEffectiveUpgrades(state)
-  const s=training(state)&&state.tutorial.replay?{...state,upgrades:effective,equipmentLevels:{cpu:effective.includes('cpu')?1:0,memory:effective.includes('memory')?1:0,ssd:effective.includes('ssd')?1:0,network:0,cloud:0,ai:0},incident:null}:state
+  const s=training(state)&&state.tutorial.replay?{...state,upgrades:effective,equipmentLevels:{cpu:effective.includes('cpu')?1:0,memory:effective.includes('memory')?1:0,ssd:effective.includes('ssd')?1:0,network:0,cloud:0,ai:0},storageUsedGiB:32,incident:null}:state
   const h=getHardware(s), w=WORKLOAD
   if(training(s))h.networkMbps=1000 // Loaned tutorial uplink isolates the three hardware demonstrations.
   const demand=demandFor(s),aiShare=owned(s,'ai')?(s.challenge.active?.35:.18):0
@@ -201,70 +217,67 @@ export const calculateMetrics = (state: GameState): Metrics => {
   return {hardware:h,routes:{arrived:demand,cache:cacheHits,origin:standard,ai,rejected:dropped,pending:0},writeRateGiB,cloudUsed,missedRevenue,demand,standardDemand,aiDemand,aiServed:ai,losses,served,dropped,successRate,network,compute,memory,storage,onPrem,cloud,aiCapacity,cacheHits,latency,gross,expenses,net:gross-expenses,bottleneck,utilizations}
 }
 
+export type TutorialAction = 'inspect-server' | 'select-cpu' | 'open-hint'
 const lessonDefinitions = [
-  { title: 'Welcome to your first lab', body: 'Customers send requests. Servers process them. Successful responses earn money. Let’s learn one part at a time.', target: 'server' },
-  { title: 'Follow one customer request', body: 'A request enters the gateway, reaches the server, reads storage, and returns a response. Watch the moving packet.', target: 'gateway' },
-  { title: 'Find the first bottleneck', body: '55 requests arrive each second, but the CPU can process only 40. The unserved requests are dropped. Watch the CPU meter.', target: 'diagnostics' },
-  { title: 'Install a CPU Module', body: 'The CPU does the processing work. More CPU capacity lets this server handle more requests. A training grant covers this purchase.', target: 'cpu', requiredUpgrade: 'cpu' as UpgradeId },
-  { title: 'Add working memory', body: 'The CPU is faster, but memory supports only 12 simultaneous requests. Install memory so more requests can stay in flight.', target: 'memory', requiredUpgrade: 'memory' as UpgradeId },
-  { title: 'Fix slow storage', body: '60 requests now arrive each second, but storage handles only 150 IOPS, or 50 standard requests per second. Add an SSD Array to remove this constraint.', target: 'ssd', requiredUpgrade: 'ssd' as UpgradeId },
-  { title: 'Read your business results', body: 'Every 1,000 standard responses earn $4 at fictional game prices. Operating costs are subtracted to give net income. Dropped requests earn nothing. The Hint button explains what to improve next.', target: 'economy' },
-  { title: 'Your lab is ready', body: 'You improved CPU, memory, and storage. In your own lab, use Hint for advice, compare upgrades, and experiment with risk and cost. Help can replay these lessons anytime.', target: 'diagnostics' },
+  {title:'Your first lab',body:'Inspect, upgrade, and watch your service improve.',target:'server'},
+  {title:'Open your server',body:'Click the server to look inside.',target:'server',expectedAction:'inspect-server' as TutorialAction},
+  {title:'Find the CPU',body:'Click the CPU. It processes customer requests.',target:'cpu',expectedAction:'select-cpu' as TutorialAction},
+  {title:'Give the CPU a boost',body:'The CPU cannot keep up. Buy the highlighted upgrade.',target:'cpu',requiredUpgrade:'cpu' as UpgradeId},
+  {title:'Add working memory',body:'Memory keeps active work ready. Upgrade it next.',target:'memory',requiredUpgrade:'memory' as UpgradeId},
+  {title:'Upgrade Storage (SSD)',body:'Storage supplies customer data. A faster drive removes this limit.',target:'ssd',requiredUpgrade:'ssd' as UpgradeId},
+  {title:'Ask for a hint',body:'Click Hint to check how your service is doing.',target:'hint',expectedAction:'open-hint' as TutorialAction},
+  {title:'Your lab is ready',body:'Keep an eye on profit and use Hint when a component needs attention.',target:'server'},
 ]
 
-export const getTutorialLesson = (s: GameState) => {
-  const lesson = lessonDefinitions[s.tutorial.step] ?? lessonDefinitions[0]
-  const t = s.tutorial
-  let body = lesson.body
-  if (t.demonstrated && t.step >= 3 && t.step <= 5) body = `${upgradeById[lesson.requiredUpgrade!].name} is installed. Compare the physical specifications, served requests, and capacity meters: removing one constraint can reveal the next.`
-  if (t.phase === 'demo') body = t.step <= 2 ? lesson.body : 'Watch the result: requests are being served with the upgraded capacity. The demonstration will pause automatically.'
-  const actionLabel = t.step === 7 ? 'Run my lab' : t.demonstrated ? 'Next lesson' : t.step === 1 || t.step === 2 ? 'Run demonstration' : lesson.requiredUpgrade ? 'Show required upgrade' : 'Continue'
-  return { ...lesson, body, actionLabel, progress: t.step + 1 }
+export const getTutorialLesson = (s:GameState) => {
+  const lesson=lessonDefinitions[s.tutorial.step]??lessonDefinitions[0]
+  return {...lesson,actionLabel:s.tutorial.step===7?'Run my lab':'Continue tutorial',nextLabel:s.tutorial.step===7?'Run my lab':'Continue tutorial',progress:s.tutorial.step+1}
 }
-
-const syncTutorial = (s: GameState) => { s.tutorialStep = s.tutorial.step; s.tutorialComplete = s.tutorial.status === 'complete' || s.tutorial.status === 'skipped' }
-export const startTutorial = (state: GameState) => {
-  const s = structuredClone(state)
-  s.tutorial = { status: 'active', step: 1, phase: 'explain', demoRemaining: 0, replay: false, demonstrated: false }
-  s.paused = true; syncTutorial(s); s.metrics = calculateMetrics(s)
+const syncTutorial = (s:GameState) => {s.tutorialStep=s.tutorial.step;s.tutorialComplete=s.tutorial.status==='complete'||s.tutorial.status==='skipped'}
+const moveTutorial = (s:GameState,step:number) => {
+  s.tutorial.step=Math.min(7,step);s.tutorial.phase=[1,2,6].includes(step)?'action':'explain';s.tutorial.demoRemaining=0;s.tutorial.demonstrated=false
+  s.paused=s.tutorial.phase==='explain';syncTutorial(s)
+}
+export const startTutorial = (state:GameState) => {
+  const s=structuredClone(state)
+  s.tutorial={status:'active',step:1,phase:'action',demoRemaining:0,replay:false,demonstrated:false}
+  s.paused=false;syncTutorial(s);s.metrics=calculateMetrics(s);return s
+}
+export const replayTutorial = (state:GameState) => {
+  const s=startTutorial(state);s.tutorial.replay=true;s.tutorial.returnPaused=state.paused;s.metrics=calculateMetrics(s);return s
+}
+export const skipTutorial = (state:GameState) => {
+  const s=structuredClone(state),wasReplay=s.tutorial.replay
+  s.tutorial.status='skipped';s.tutorial.phase='explain';s.tutorial.demoRemaining=0
+  s.paused=wasReplay?(s.tutorial.returnPaused??false):false;syncTutorial(s);s.metrics=calculateMetrics(s)
+  addLog(s,'Open Lab online. Use Hint for a quick service check.','good')
+  if(!wasReplay)awardAchievements(s)
   return s
 }
-export const replayTutorial = (state: GameState) => {
-  const s = startTutorial(state)
-  s.tutorial.replay = true
-  s.metrics = calculateMetrics(s)
-  return s
+export const tutorialAction = (state:GameState,action:TutorialAction) => {
+  const t=state.tutorial
+  if(t.status!=='active'||t.phase!=='action'||getTutorialLesson(state).expectedAction!==action)return state
+  const s=structuredClone(state);moveTutorial(s,t.step+1);s.metrics=calculateMetrics(s);return s
 }
-export const skipTutorial = (state: GameState) => {
-  const s = structuredClone(state)
-  s.tutorial.status = 'skipped'; s.tutorial.phase = 'explain'; s.tutorial.demoRemaining = 0
-  s.paused = false; syncTutorial(s); s.metrics = calculateMetrics(s)
-  addLog(s, 'Open Lab online. Use Hint when you want help with your next decision.', 'good')
-  if (!s.tutorial.replay) awardAchievements(s)
-  return s
-}
-export const advanceTutorial = (state: GameState) => {
-  if (state.tutorial.status !== 'active' || state.tutorial.phase === 'demo' || state.tutorial.phase === 'action') return state
-  const s = structuredClone(state), t = s.tutorial
-  if (t.step === 7) {
-    t.status = 'complete'; s.paused = false; s.nextIncidentAt = s.elapsed + 150
-    addLog(s, 'Orientation complete. Build the infrastructure your way.', 'good')
-    if (!t.replay) awardAchievements(s)
-  } else if (t.demonstrated || t.step === 6) {
-    t.step++; t.demonstrated = false; t.phase = 'explain'; s.paused = true
-  } else if (t.step <= 2) { t.phase = 'demo'; t.demoRemaining = 4; s.paused = false }
-  else {
-    const upgrade = lessonDefinitions[t.step].requiredUpgrade!
-    t.phase = owned(s, upgrade) ? 'demo' : 'action'
-    t.demoRemaining = owned(s, upgrade) ? 4 : 0
-    s.paused = !owned(s, upgrade)
-    const grant = owned(s, upgrade) ? 0 : Math.max(0, upgradeById[upgrade].cost - s.cash)
-    if (grant) { s.cash += grant; s.revenue.grants+=grant; addLog(s, `Training grant: +$${Math.ceil(grant)} for ${upgradeById[upgrade].name}.`, 'good') }
+export const advanceTutorial = (state:GameState) => {
+  if(state.tutorial.status!=='active'||state.tutorial.phase!=='explain')return state
+  const s=structuredClone(state),t=s.tutorial
+  if(t.step===7){
+    t.status='complete';s.paused=t.replay?(t.returnPaused??false):false;s.nextIncidentAt=s.elapsed+150
+    addLog(s,'Orientation complete. Build the infrastructure your way.','good');if(!t.replay)awardAchievements(s)
+  }else{
+    const upgrade=lessonDefinitions[t.step].requiredUpgrade
+    if(!upgrade)return state
+    if(!t.replay&&owned(s,upgrade))moveTutorial(s,t.step+1)
+    else{
+      t.phase='action';t.demoRemaining=0;s.paused=false
+      const grant=t.replay?0:Math.max(0,getEquipmentQuote({...s,tutorial:{...t,phase:'action'}},upgrade as EquipmentId).cost-s.cash)
+      if(grant){s.cash+=grant;s.revenue.grants+=grant;addLog(s,`Training grant: +$${Math.ceil(grant)} for ${upgradeById[upgrade].name}.`,'good')}
+    }
   }
-  syncTutorial(s); s.metrics = calculateMetrics(s)
-  return s
+  syncTutorial(s);s.metrics=calculateMetrics(s);return s
 }
-export const inspectDiagnostics = (s: GameState) => advanceTutorial(s)
+export const inspectDiagnostics = (s:GameState) => advanceTutorial(s)
 
 export const canPurchase = (s: GameState, id: UpgradeId) => {
   if (id === 'cpu' || id === 'memory' || id === 'ssd') {
@@ -295,7 +308,7 @@ const makeIncident = (kind: IncidentKind, s: GameState): Incident => {
 const announceIncident = (s:GameState) => {
   if(!s.incident)return
   const story=EVENT_STORIES[s.incident.kind]
-  announce(s,'incident',story.title,`${story.body} Expected duration: ${s.incident.total} minutes.`,{illustration:s.incident.kind,tip:story.tip})
+  announce(s,'incident',story.title,`${story.body} Duration: ${Math.ceil(s.incident.remaining)} minutes.`,{illustration:s.incident.kind,tip:story.tip})
 }
 
 const queueIncident = (s: GameState, kind: IncidentKind) => {
@@ -321,8 +334,8 @@ export const purchaseUpgrade = (state: GameState, id: UpgradeId) => {
     if (milestone[id]) queueIncident(s, milestone[id]!)
   }
   s.metrics = calculateMetrics(s)
-  s.lastPurchase = {id,at:s.elapsed,before:calculateMetrics(state),after:s.metrics}
-  announce(s,'technology',`${item.name} acquired!`,`Congrats! You added ${item.name.toLowerCase()} to your cloud infrastructure. ${item.lesson}`,{illustration:id,impact:s.lastPurchase,tip:TECHNOLOGY_TIPS[id]})
+  s.lastPurchase = {id,at:s.elapsed,before:calculateMetrics(state),after:s.metrics,beforeLevel:0,afterLevel:1,quantity:1,cost:item.cost}
+  announce(s,'technology',`Acquired: ${item.name}`,item.short,{illustration:id,impact:s.lastPurchase,tip:TECHNOLOGY_TIPS[id]})
   awardAchievements(s)
   return s
 }
@@ -406,8 +419,7 @@ const tick = (s: GameState, dt: number) => {
     if (!training(s)) s.aiServed += s.metrics.aiServed * dt * 60
   }
   if (training(s)) {
-    s.tutorial.demoRemaining = Math.max(0, s.tutorial.demoRemaining - dt)
-    if (s.tutorial.demoRemaining <= .000001) { s.tutorial.phase = 'explain'; s.tutorial.demonstrated = true; s.paused = true }
+    if(s.tutorial.phase==='demo'){s.tutorial.demoRemaining=Math.max(0,s.tutorial.demoRemaining-dt);if(s.tutorial.demoRemaining<=.000001)moveTutorial(s,s.tutorial.step+1)}
     return
   }
   const repDelta = s.metrics.successRate >= .98 ? .05 : -.06 * (1 - s.metrics.successRate)
@@ -471,10 +483,10 @@ const tick = (s: GameState, dt: number) => {
 }
 
 export const stepGame = (state: GameState, realDelta: number): GameState => {
-  if (state.paused || !Number.isFinite(realDelta) || realDelta <= 0) return state
+  if (state.paused || getNextAnnouncement(state) || !Number.isFinite(realDelta) || realDelta <= 0) return state
   const s = structuredClone(state)
   let remaining = realDelta * s.speed
-  while (remaining > .000001 && !s.paused) { const dt = Math.min(.1, remaining, s.incident&& !training(s)?Math.max(.000001,s.incident.remaining):Infinity); tick(s, dt); remaining -= dt }
+  while (remaining > .000001 && !s.paused && !getNextAnnouncement(s)) { const dt = Math.min(.1, remaining, s.incident&& !training(s)?Math.max(.000001,s.incident.remaining):Infinity,s.challenge.active?Math.max(.000001,s.challenge.remaining):Infinity); tick(s, dt); remaining -= dt }
   s.metrics = calculateMetrics(s)
   return s
 }
@@ -506,7 +518,7 @@ export const loadGame = (value: string): GameState | null => {
     const validImpact = (v:unknown):v is import('./types').PurchaseImpact => {
       if(!v||typeof v!=='object')return false
       const x=v as import('./types').PurchaseImpact
-      return [...ids,'network'].includes(x.id)&&finite(x.at)&&validMetrics(x.before)&&validMetrics(x.after)
+      return [...ids,'network'].includes(x.id)&&finite(x.at)&&validMetrics(x.before)&&validMetrics(x.after)&&['beforeLevel','afterLevel','quantity','cost'].every(k=>(x as unknown as Record<string,unknown>)[k]===undefined||finite((x as unknown as Record<string,unknown>)[k]))
     }
     if (!p || ![1, 2, 3, 4, 5].includes(p.version) || !finite(p.cash,p.version===5?-1e15:0) || !Array.isArray(p.upgrades)) return null
     if (new Set(p.upgrades).size !== p.upgrades.length || p.upgrades.some((id: UpgradeId) => !ids.includes(id) || (!(p.version >= 3 && (id === 'memory' || id === 'ssd')) && upgradeById[id].prerequisites.some((dep) => !p.upgrades.includes(dep))))) return null
@@ -548,13 +560,14 @@ export const loadGame = (value: string): GameState | null => {
     if (p.version >= 2) {
       const t = p.tutorial
       if (!t || !['welcome', 'active', 'complete', 'skipped'].includes(t.status) || !Number.isInteger(t.step) || t.step < 0 || t.step > 7 || !['explain', 'demo', 'action'].includes(t.phase) || !finite(t.demoRemaining, 0, 4) || typeof t.replay !== 'boolean' || typeof t.demonstrated !== 'boolean') return null
-      if (t.phase === 'action' && ![3, 4, 5].includes(t.step)) return null
+      if (t.phase === 'action' && ![1,2,3,4,5,6].includes(t.step)) return null
       if (t.phase !== 'explain' && t.status !== 'active') return null
       if (t.status === 'welcome' && t.step !== 0) return null
       if (t.status === 'active' && t.step < 1) return null
-      if (t.phase === 'action' && p.upgrades.includes(lessonDefinitions[t.step].requiredUpgrade)) return null
+      if (t.returnPaused!==undefined&&typeof t.returnPaused!=='boolean')return null
+      if (t.phase === 'action' && !t.replay && p.upgrades.includes(lessonDefinitions[t.step].requiredUpgrade)) return null
       s.tutorial = { ...t }; syncTutorial(s)
-      if (training(s) && t.phase !== 'demo') s.paused = true
+      if (training(s)) s.paused=t.phase==='explain'
       for (const key of ['cloudProvisioned', 'aiProvisioned', 'scaleTimer'] as const) { if (!finite(p[key], 0, key === 'cloudProvisioned' ? (p.version===5?8:84 + s.equipmentLevels.cloud * 6) : key === 'aiProvisioned' ? (p.version===5?4:48 + s.equipmentLevels.ai * 4) : 10.000001)) return null; s[key] = p[key] }
       if (!p.upgradeTimes || typeof p.upgradeTimes !== 'object') return null
       for (const id of ids) if (p.upgradeTimes[id] !== undefined) { if (!finite(p.upgradeTimes[id], 0, s.elapsed)) return null; s.upgradeTimes[id] = p.upgradeTimes[id] }
@@ -618,6 +631,20 @@ export const loadGame = (value: string): GameState | null => {
       if(s.incident)s.incident.stats=emptyEventStats(true)
       addLog(s,'Lab upgraded to real hardware units. Your funds and purchases were preserved.','good')
     }
+    if(p.uiRevision!==undefined&&p.uiRevision!==2)return null
+    if(p.uiRevision!==2){
+      s.acknowledgedAnnouncements=[...new Set([...s.acknowledgedAnnouncements,...s.announcements.map(a=>a.id)])]
+      s.announcements=[]
+      if(s.tutorial.status==='active'){
+        const t=s.tutorial
+        if(t.phase==='demo'||t.demonstrated)moveTutorial(s,Math.min(7,t.step+1))
+        else if([1,2,6].includes(t.step)){t.phase='action';s.paused=false}
+        else s.paused=t.phase==='explain'
+      }
+      if(s.incident)announceIncident(s)
+      addLog(s,'Interface updated. Earlier notifications remain in event history.','info')
+    }
+    s.uiRevision=2
     s.metrics = calculateMetrics(s)
     return s
   } catch { return null }

@@ -1,56 +1,49 @@
 # CloudLab
 
-CloudLab is a pixel-art cloud infrastructure tycoon built with React, TypeScript, and Vite. Start with an office server, learn to identify bottlenecks, expand into a rooftop facility and cloud operations room, and test the system with AI Launch Day.
+CloudLab is a pixel-art infrastructure tycoon built with React, TypeScript, and Vite. Start with a borrowed server, learn to remove bottlenecks, expand into cloud services, and test your design on Launch Day.
 
-## Run locally
+## Run and verify
 
 ```bash
 npm install
 npm run dev
-```
-
-## Verify
-
-```bash
 npm test
 npm run build
 npm run test:e2e
 ```
 
-## Play and learn
+## Play the system
 
-A new lab opens at a paused welcome screen. **Start tutorial** provides funded, guided experiments; **Skip to sandbox** starts independent play. Tutorial explanations pause the lab. **Help** can replay training without spending live company funds or deleting progress.
+The desktop playfield fits the available window. The floating tuning console shows one part at a time: choose **Equipment** or **Technology**, then a component. Choosing CPU, Memory, Storage (SSD), or Network focuses its physical location inside the server. Cloud and GPU controls focus their remote service nodes. Clicking the scene also selects the corresponding controls without changing views.
 
-Three linked views explain the same system. **Workshop** shows the facility and city; **Server Interior** reveals the CPU, RAM, drives, network interface, motherboard, power supply, and cooling; **Service Flow** shows how customers, cache, application servers, shared storage, and GPU services interact. Select equipment to inspect or upgrade it. Moving packets are a sample of traffic, not one sprite per customer request.
+Each card provides a short purpose, physical specifications, the next upgrade, and its price. Missing prerequisites are links to the required component. **Learn more** keeps the conversion assumptions and deeper explanations available on separate pages. Upgrades show a local level change and specification-change badge in all three views. Rented resources show their startup state until they are ready.
 
-CPU specifications use cores and GHz; memory uses GiB; storage shows used/total space, IOPS, and MiB/s; networking uses Mbps/Gbps; GPUs show their count and VRAM. Workload profiles convert these specifications into estimated requests/second. **Why?** explains the assumptions: GHz measures clock cycles, not a universal number of instructions or operations. Storage capacity and storage access performance are separate limits.
+**Workshop** shows your facility and city, **Server Interior** shows the physical parts, and **Service Flow** shows requests, shared data, cache, cloud, and GPU routes. Facility artwork advances through workshop, rooftop, cloud operations, and AI milestones. Moving segments represent sampled traffic, not one sprite per request.
 
-Virtualization partitions existing hardware with overhead. Load balancing distributes requests and checks healthy servers without creating CPU or network bandwidth. Cloud instances are rented and incur recurring charges; adding compute does not remove the shared storage limit. Backups help restoration, while redundancy and failover help availability. AI requests still need application and data handling as well as GPU capacity.
+The tutorial teaches by asking you to inspect, select, and upgrade real components. Required purchases are funded, traffic continues during guided actions, and explanations pause for reading. Replay preserves the live company. **Hint** opens a small bubble explaining the current constraint, or tells you everything is working well.
 
-**Hint** is optional. Upgrade previews compare physical resources, expected throughput, current-demand income, and the remaining bottleneck. Hardware specifications have bounded tiers; expansion continues through additional machines and rented resources. The milestone strip explains the next capability. The city and facility change as the company reaches rooftop, cloud, and AI milestones. Customer demand grows from service performance and reputation, rather than jumping when hardware is purchased.
+Major incidents, event results, technology acquisitions, and launch results use short popups. Reading pauses the simulation; Continue restores the previous manual pause state. Incident results distinguish actual net profit or loss from potential revenue that was never earned. History remains available from the menu.
 
-Routine technology unlocks, achievements, incidents, and completed reports use live notifications and do not interrupt play. Deliberately opening a report pauses the simulation until it closes and preserves any manual pause. Diagnostics, Finance, operating policies, achievements, and event history remain available beneath the scene.
+## Money, time, and hardware
 
-## Economy and time
-
-All prices are fictional game prices, not cloud-provider quotations. Completed standard requests earn **$4 per 1,000 requests**; completed AI requests earn **$12 per 1,000 requests**. Rejected requests earn nothing. The Finance ledger separates customer revenue, rewards, training grants, equipment and technology purchases, and operating expenses:
+All prices are fictional game prices. Completed standard responses earn **$4 per 1,000**, and AI responses earn **$12 per 1,000**. Rejected work earns nothing.
 
 **Available funds = opening funds + customer revenue + rewards + training grants − purchases − operating expenses.**
 
-The response terminal shows recorded customer revenue only. Purchases, rewards, and grants are not customer earnings. Operating costs continue for provisioned resources even when they are idle. Negative funds retain the debt rather than silently discarding costs; **Stop rentals** reduces rental costs to help the company recover.
+The steady **Profit/min** badge is customer revenue minus operating expenses. Green means profit, red means loss, and zero is neutral. Purchases, rewards, and grants are separate transactions. Funds keep a fixed layout and update calmly; purchase deductions appear immediately. Running cloud and GPU instances incur costs even when idle. **Stop rentals** reduces those costs; debt is retained rather than silently discarded.
 
-At **1×**, one real second advances one simulated **minute**. The 2× and 4× controls accelerate that clock. Throughput is displayed in requests/second and financial rates in dollars/minute; the engine converts those units when integrating progress. Pause, hidden tabs, and closed pages produce no offline earnings.
+At 1×, one real second advances one simulated minute. The 2× and 4× controls accelerate that clock. Hardware and traffic rates use seconds, while financial rates use minutes. Paused, hidden, and closed pages produce no offline earnings.
 
-## Saves and compatibility
+CPU uses cores and GHz; RAM uses GiB; storage uses GiB, IOPS, and MiB/s; networking uses Mbps/Gbps; GPUs show count and VRAM. Explicit workload assumptions produce the displayed capacity estimates. GHz measures clock cycles, not a universal operations count. Virtualization partitions existing hardware with overhead, load balancing routes traffic without creating bandwidth, and additional compute remains constrained by shared data resources. Backups support restoration; healthy replicas and failover support availability.
 
-Progress is stored in browser localStorage, including tutorial progress, hardware levels, finances, policies, achievements, and manual pause. Older saves migrate to **version five**, preserving cash, purchases, and progression while mapping hardware levels to the new catalog. A pre-migration backup remains recoverable from **Save**. Historical achievements are recognized without issuing rewards twice. Invalid imports leave the current company unchanged.
+## Saves and accessibility
 
-Use **Save** to export a portable snapshot. Keep an exported backup before resetting the lab or clearing browser storage.
+Progress is stored locally in the browser, including purchases, finances, achievements, tutorial progress, and manual pause. Existing version-five companies and older saves remain compatible. Legacy pending notifications are archived rather than replayed as a backlog. Historical reports remain accessible. Invalid imports leave the current company unchanged; pre-migration backups remain recoverable where available.
 
-## Artwork and accessibility
+The menu opens compact Finance, Operations, Achievements, History, Help, Save, and settings overlays. Longer information uses pages or tabs. Export a backup before resetting or clearing browser storage.
 
-The city, equipment, people, diagrams, and signs use original pixel-style SVG artwork. Locally bundled font licenses are included under `public/fonts/`. Neon lettering has aligned sign housings and bright cores; essential text stays readable without glow. Reduced motion keeps information available with static artwork. Sound is optional. Interactive equipment, tabs, dialogs, and controls support keyboard navigation.
+The original SVG city, equipment, people, and signs share locally bundled pixel fonts; licenses are under `public/fonts/`. Controls support keyboard navigation and clear focus. Reduced motion retains static highlights and upgrade badges without camera motion. Sound is optional.
 
 ## Browser QA
 
-The Playwright suite tests the production build. Close any unrelated server on port 4173 before running it. Chromium runs the gameplay and accounting scenarios; Firefox and WebKit run welcome, controls, and desktop-layout smoke tests. Tests cover tutorial completion, purchases, continuous play, physical specifications, linked views, saves, finances, policies, launch results, and responsive layouts. Screenshots are written to `test-results/`.
+Playwright tests the production build on localhost port 4173. Close unrelated servers on that port before running the suite. Chromium covers gameplay, guided actions, prerequisite navigation, popups, finances, saves, and upgrade feedback. Firefox and WebKit run desktop smoke checks. Responsive checks cover compact desktop windows through 1920×1080 and verify the scene, console, selectors, and overlays without page or panel scrolling. Screenshots are written to `test-results/`.

@@ -1,13 +1,14 @@
 import type { KeyboardEvent, ReactNode } from 'react'
 import type { GameState, UpgradeId } from './sim/types'
 import { getEffectiveUpgrades } from './sim/engine'
+import {useSceneCamera} from './useSceneCamera'
 
-type Props = { state: GameState; selected: string; setSelected: (id: string) => void; flow: boolean; pulse?: string; beginner?: boolean; highlight?: string; earningPulse?:boolean; presentationPaused?:boolean }
+type Props = { state: GameState; selected: string; setSelected: (id: string) => void; flow: boolean; pulse?: string; beginner?: boolean; highlight?: string; earningPulse?:boolean; presentationPaused?:boolean; focus?:string; compact?:boolean }
 
 function Selectable({id,label,x,y,w=130,h=40,selected,setSelected,locked=false,pulse,children}:{id:string;label:string;x:number;y:number;w?:number;h?:number;selected:string;setSelected:(id:string)=>void;locked?:boolean;pulse?:string;children:ReactNode}) {
   const key=(e:KeyboardEvent<SVGGElement>)=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();setSelected(id)}}
-  return <g className={`machine ${selected===id?'machine-selected':''} ${locked?'machine-locked':''} ${pulse===id?'machine-pulse':''}`} transform={`translate(${x} ${y})`} role="button" aria-label={`Select ${label}`} aria-pressed={selected===id} tabIndex={0} onClick={()=>setSelected(id)} onKeyDown={key}>
-    <title>{label}{locked?' · not installed':' · select to inspect or upgrade'}</title>{children}<g className="machine-tag" transform="translate(0 -29)"><rect width={w} height="24"/><text x="8" y="17">{label.toUpperCase()}</text></g><rect className="machine-hit" x="-4" y="-32" width={w+8} height={h+36} fill="transparent"/>
+  return <g data-component-id={id} className={`machine ${selected===id?'machine-selected':''} ${locked?'machine-locked':''} ${pulse===id?'machine-pulse':''}`} transform={`translate(${x} ${y})`} role="button" aria-label={`Select ${label}`} aria-pressed={selected===id} tabIndex={0} onClick={()=>setSelected(id)} onKeyDown={key}>
+    {id==='server'&&['cpu','memory','ssd','virtualization'].map(alias=><rect key={alias} data-component-id={alias} x="0" y="0" width={w} height={h} fill="transparent" pointerEvents="none"/>)}<title>{label}{locked?' · not installed':' · select to inspect or upgrade'}</title>{children}<g className="machine-tag" transform="translate(0 -29)"><rect width={w} height="24"/><text x="8" y="17">{label.toUpperCase()}</text></g><rect className="machine-hit" x="-4" y="-32" width={w+8} height={h+36} fill="transparent"/>
   </g>
 }
 function Rack({x=0,y=0,w=130,h=210,rows=6,tone='#5ef0d1'}:{x?:number;y?:number;w?:number;h?:number;rows?:number;tone?:string}){
@@ -20,15 +21,19 @@ function Neon({x,y,w,text,color='#ff71b8',vertical=false}:{x:number;y:number;w:n
  const h=vertical?text.length*24+20:44
  return <g transform={`translate(${x} ${y})`} className="neon-sign" style={{color}}><path d={`M-12 9H0m-12 ${h-18}H0`} stroke="#60708a" strokeWidth="5"/><rect width={w} height={h} fill="#161c32" stroke="#4e3658" strokeWidth="4"/><rect x="5" y="5" width={w-10} height={h-10} fill="none" stroke={color} strokeWidth="2" className="neon-tube"/>{vertical?[...text].map((letter,i)=><text key={i} x={w/2} y={27+i*24} textAnchor="middle" fill={color} className="neon-letters">{letter}</text>):<text x={w/2} y="30" textAnchor="middle" fill={color} className="neon-letters">{text}</text>}</g>
 }
-export default function Workshop({state,selected,setSelected,flow,pulse,beginner,highlight,earningPulse,presentationPaused}:Props){
+export default function Workshop({state,selected,setSelected,flow,pulse,beginner,highlight,earningPulse,presentationPaused,focus,compact=false}:Props){
+ const {svgRef,viewBox}=useSceneCamera(1280,720,focus,compact)
+ const picked=highlight??selected
+ const sceneSelected=['cpu','memory','ssd','virtualization'].includes(picked)?'server':picked
+ const sceneHighlight=['cpu','memory','ssd','virtualization'].includes(highlight??'')?'server':highlight
  const has=(id:UpgradeId)=>getEffectiveUpgrades(state).includes(id)
  const rooftop=has('server2')&&has('load_balancer'),dc=has('cloud')&&has('autoscaling'),ai=has('ai')
  const era=ai?'ai':dc?'datacenter':rooftop?'rooftop':'workshop'
  const running=!state.paused&&!presentationPaused
- const props=(id:string,label:string,x:number,y:number,w=130,h=40,locked=false)=>({id,label,x,y,w,h,selected,setSelected,locked,pulse})
+ const props=(id:string,label:string,x:number,y:number,w=130,h=40,locked=false)=>({id,label,x,y,w,h,selected:sceneSelected,setSelected,locked,pulse:sceneHighlight===id?id:pulse})
  const tier=Math.min(5,state.equipmentLevels.cpu+state.equipmentLevels.memory+state.equipmentLevels.ssd)
- return <div className={`workshop-stage era-${era} ${earningPulse?'billing-active':''} ${!running?'scene-paused':''} ${beginner?'beginner-workshop':''}`} data-era={era} aria-label="CloudLab workshop">
-  <svg className="workshop-room" viewBox="0 0 1280 720" role="group" aria-label={`${dc?'Data-center operations room':rooftop?'Rooftop server facility':'Street-level server workshop'} overlooking a neon city`} shapeRendering="crispEdges">
+ return <div className={`workshop-stage era-${era} ${earningPulse?'billing-active':''} ${!running?'scene-paused':''} ${beginner?'beginner-workshop':''}`} data-era={era} aria-label="CloudLab workshop" style={compact?{height:'100%',width:'100%',minHeight:0,overflow:'hidden'}:undefined}>
+  <svg ref={svgRef} className="workshop-room" viewBox={viewBox} preserveAspectRatio="xMidYMid meet" style={compact?{width:'100%',height:'100%',minHeight:0,maxHeight:'none'}:undefined} role="group" aria-label={`${dc?'Data-center operations room':rooftop?'Rooftop server facility':'Street-level server workshop'} overlooking a neon city`} shapeRendering="crispEdges">
    <defs>
     <linearGradient id="city-sky" x2="0" y2="1"><stop stopColor="#0b0e27"/><stop offset=".65" stopColor="#252441"/><stop offset="1" stopColor="#9a4654"/></linearGradient>
     <linearGradient id="room-floor" x2="0" y2="1"><stop stopColor="#393141"/><stop offset="1" stopColor="#111729"/></linearGradient>
@@ -88,8 +93,8 @@ export default function Workshop({state,selected,setSelected,flow,pulse,beginner
    <g className="pixel-person" transform="translate(628 477)"><path d="M10 0h17v8H10Z" fill="#242033"/><rect x="12" y="8" width="13" height="14" fill="#c98a70"/><path d="M8 23h21v37H6Z" fill="#4e455f"/><path d="M11 31h14v21H11Z" fill="#94605e"/><path d="M8 60h9v35H7m14-35h9v35h-9" fill="#172437"/><path d="M3 95h16m1 0h15" stroke="#0b1527" strokeWidth="6"/><path d="M7 25 2 59h8m18-34 7 32h-9" fill="#41415b"/></g>
    <g className="room-sticker"><rect x="58" y="671" width="271" height="25" fill="#12323a"/><text x="68" y="688">NO COFFEE ON RACKS / EST. 209</text></g>
    <text x="718" y="696" className="facility-readout">{ai?'04 / AI SERVICE ONLINE':dc?'03 / CLOUD OPERATIONS':rooftop?'02 / ROOFTOP FACILITY':'01 / BORROWED SERVER, BIG IDEAS'}</text>
-   {highlight&&<text x="45" y="38" className="equipment-label" fill="#9ef1c9">TRAINING TARGET / {highlight.toUpperCase()}</text>}
+   {highlight&&!compact&&<text x="45" y="38" className="equipment-label" fill="#9ef1c9">TRAINING TARGET / {highlight.toUpperCase()}</text>}
   </svg>
-  <div className="scene-caption"><span className="scene-status-dot"/>{running?'Systems running':'Lab paused'}<span>Inspect the server to see its components</span></div>
+  {!compact&&<div className="scene-caption"><span className="scene-status-dot"/>{running?'Systems running':'Lab paused'}<span>Inspect the server to see its components</span></div>}
  </div>
 }

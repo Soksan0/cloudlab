@@ -1,34 +1,43 @@
 import { describe, expect, it } from 'vitest'
-import { ACHIEVEMENTS, acknowledgeAnnouncement, advanceTutorial, calculateMetrics, canPurchase, createInitialState, getChallengeReadiness, getEquipmentQuote, getHardware, getMilestone, getNextAnnouncement, getRecommendation, loadGame, previewEquipmentImpact, purchaseEquipment, purchaseUpgrade, replayTutorial, serializeGame, setPolicy, setRentalsEnabled, skipTutorial, startChallenge, startTutorial, stepGame, triggerIncident } from './engine'
+import { ACHIEVEMENTS, acknowledgeAnnouncement, advanceTutorial, calculateMetrics, canPurchase, createInitialState, getChallengeReadiness, getEquipmentQuote, getHardware, getMilestone, getNextAnnouncement, getRecommendation, loadGame, previewEquipmentImpact, purchaseEquipment, purchaseUpgrade, replayTutorial, serializeGame, setPolicy, setRentalsEnabled, skipTutorial, startChallenge, startTutorial, stepGame, triggerIncident, tutorialAction } from './engine'
 import { UPGRADES } from './upgrades'
 import { AI_PRICE, MAX_LEVELS, STANDARD_PRICE, WORKLOAD } from './hardware'
 import type { EquipmentId, GameState } from './types'
 function fund(s:GameState,cash=1e6){s.revenue.opening+=cash-s.cash;s.cash=cash;return s}
 function lab(){const s=skipTutorial(createInitialState());s.nextIncidentAt=1e9;return s}
-function full(){let s=fund(lab());for(const u of UPGRADES)s=purchaseUpgrade(s,u.id);return stepGame(s,2.1)}
+function ack(s:GameState){let a=getNextAnnouncement(s);while(a){s=acknowledgeAnnouncement(s,a.id);a=getNextAnnouncement(s)}return s}
+function full(){let s=fund(lab());for(const u of UPGRADES)s=ack(purchaseUpgrade(s,u.id));return stepGame(s,2.1)}
 function balance(s:GameState){const r=s.revenue;expect(s.cash).toBeCloseTo(r.opening+r.gross+r.grants+r.rewards-r.purchases-r.expenses,6)}
 function prepared(){let s=full();for(const id of ['cpu','memory','ssd','network'] as EquipmentId[])s=purchaseEquipment(s,id,'max');s=purchaseEquipment(s,'ai','max');s=stepGame(s,2.1);s.reputation=90;return s}
 
 describe('guided learning',()=>{
  it('leaves a fresh company paused until the welcome choice',()=>{const s=createInitialState();expect(stepGame(s,30)).toEqual(s);expect(s.tutorial.status).toBe('welcome');expect(canPurchase(s,'cpu').ok).toBe(false)})
- it('completes funded actions with observable CPU, RAM and storage constraints',()=>{
-  let s=startTutorial(createInitialState());s=advanceTutorial(s);s=stepGame(s,4.1);s=advanceTutorial(s);s=advanceTutorial(s);s=stepGame(s,4.1)
-  expect(s.metrics.bottleneck).toBe('compute');s=advanceTutorial(s)
-  for(const [id,next] of [['cpu','memory'],['memory','healthy'],['ssd','healthy']] as const){
-   s=advanceTutorial(s);expect(s.tutorial.phase).toBe('action');expect(canPurchase(s,id).ok).toBe(true)
-   s=purchaseEquipment(s,id);expect(s.tutorial.phase).toBe('demo');balance(s)
-   if(id==='cpu')expect(s.metrics.bottleneck).toBe(next)
-   s=stepGame(s,4.1);expect(s.paused).toBe(true);s=advanceTutorial(s)
-   if(id==='memory')expect(s.metrics.bottleneck).toBe('storage')
+ it('requires real guided actions and runs service between explanations',()=>{
+  let s=startTutorial(createInitialState());expect(s.paused).toBe(false);expect(s.tutorial.step).toBe(1)
+  expect(tutorialAction(s,'open-hint')).toBe(s);expect(advanceTutorial(s)).toBe(s)
+  const active=stepGame(s,1);expect(active.elapsed).toBeGreaterThan(s.elapsed);expect(active.totalServed).toBeGreaterThan(s.totalServed)
+  s=tutorialAction(active,'inspect-server');expect(s.tutorial.step).toBe(2);expect(s.tutorial.phase).toBe('action')
+  s=tutorialAction(s,'select-cpu');expect(s.tutorial.step).toBe(3);expect(s.paused).toBe(true)
+  for(const id of ['cpu','memory','ssd'] as const){
+   s=advanceTutorial(s);expect(s.tutorial.phase).toBe('action');expect(s.paused).toBe(false);expect(canPurchase(s,id).ok).toBe(true)
+   const before=stepGame(s,1);expect(before.elapsed).toBeGreaterThan(s.elapsed)
+   s=purchaseEquipment(before,id);expect(s.lastPurchase?.beforeLevel).toBe(0);expect(s.lastPurchase?.afterLevel).toBe(1);expect(s.lastPurchase?.quantity).toBe(1);balance(s)
   }
-  s=advanceTutorial(s);s=advanceTutorial(s);expect(s.tutorialComplete).toBe(true);expect(s.paused).toBe(false);balance(s)
+  expect(s.tutorial.step).toBe(6);expect(s.paused).toBe(false)
+  s=tutorialAction(s,'open-hint');expect(s.tutorial.step).toBe(7);expect(s.paused).toBe(true)
+  s=advanceTutorial(s);expect(s.tutorialComplete).toBe(true);expect(s.paused).toBe(false);balance(s)
  })
- it('replays a baseline without changing live finances, data or achievements',()=>{
-  let s=prepared();s.paused=true;const original={cash:s.cash,revenue:s.revenue,used:s.storageUsedGiB,achievements:s.achievementIDs}
+ it('replay upgrades use effective baseline hardware without changing live finances or equipment',()=>{
+  let s=prepared();s.paused=true;const original=structuredClone(s)
   s=replayTutorial(s);expect(s.metrics.compute).toBe(40);expect(s.metrics.cloud).toBe(0)
-  s=stepGame(advanceTutorial(s),4.1);expect(s.cash).toBe(original.cash);expect(s.revenue).toEqual(original.revenue);expect(s.storageUsedGiB).toBe(original.used);expect(s.achievementIDs).toEqual(original.achievements)
+  s=tutorialAction(s,'inspect-server');s=tutorialAction(s,'select-cpu')
+  for(const id of ['cpu','memory','ssd'] as const){s=advanceTutorial(s);expect(getEquipmentQuote(s,id).cost).toBe(0);expect(getEquipmentQuote(s,id).available).toBe(true);const preview=previewEquipmentImpact(s,id);s=stepGame(s,2);s=purchaseEquipment(s,id);expect(s.lastPurchase?.after.hardware).toEqual(preview.after.hardware);expect(s.lastPurchase?.beforeLevel).toBe(0);expect(s.lastPurchase?.afterLevel).toBe(1)}
+  expect(s.metrics.compute).toBe(80);expect(s.metrics.hardware.ramGiB).toBe(8);expect(s.metrics.hardware.storageIOPS).toBe(3000)
+  expect(s.cash).toBe(original.cash);expect(s.revenue).toEqual(original.revenue);expect(s.storageUsedGiB).toBe(original.storageUsedGiB);expect(s.equipmentLevels).toEqual(original.equipmentLevels);expect(s.achievementIDs).toEqual(original.achievementIDs)
+  s=advanceTutorial(tutorialAction(s,'open-hint'));expect(s.paused).toBe(true)
  })
- it('round trips a pending funded lesson without duplicate grants',()=>{let s=startTutorial(createInitialState());for(let i=0;i<2;i++)s=advanceTutorial(stepGame(advanceTutorial(s),4.1));s=advanceTutorial(s);const loaded=loadGame(serializeGame(s))!;expect(loaded.tutorial).toEqual(s.tutorial);expect(loaded.cash).toBe(s.cash);balance(loaded)})
+ it('round trips a pending funded live lesson without duplicate grants',()=>{let s=startTutorial(createInitialState());s=tutorialAction(s,'inspect-server');s=tutorialAction(s,'select-cpu');s=advanceTutorial(s);const loaded=loadGame(serializeGame(s))!;expect(loaded.tutorial).toEqual(s.tutorial);expect(loaded.paused).toBe(false);expect(loaded.cash).toBe(s.cash);balance(loaded);expect(advanceTutorial(loaded)).toBe(loaded)})
+ it('skip replay restores the pre-training manual pause',()=>{const s=prepared();s.paused=true;const next=skipTutorial(replayTutorial(s));expect(next.paused).toBe(true);expect(next.cash).toBe(s.cash)})
 })
 
 describe('physical resources and derived workload limits',()=>{
@@ -64,18 +73,21 @@ describe('rental lifecycle and continuous play',()=>{
  it('new rented capacity waits two minutes before it can serve requests',()=>{const s=full();const before=s.cloudProvisioned;const preview=previewEquipmentImpact(s,'cloud');const next=purchaseEquipment(s,'cloud');expect(next.cloudProvisioned).toBe(before);expect(next.provisioning.remaining).toBe(2);expect(stepGame(next,1).cloudProvisioned).toBe(before);const ready=stepGame(next,2.1);expect(ready.cloudProvisioned).toBe(before+1);expect(ready.metrics.cloud).toBe(preview.after.cloud)})
  it('stops billing rented pools and restarts only after provisioning',()=>{const s=full(),stop=setRentalsEnabled(s,false);expect(stop.metrics.cloud).toBe(0);expect(stop.metrics.aiCapacity).toBe(0);expect(stop.metrics.expenses).toBeLessThan(s.metrics.expenses);expect(stop.storageUsedGiB).toBe(s.storageUsedGiB);const start=setRentalsEnabled(stop,true);expect(start.metrics.cloud).toBe(0);expect(stepGame(start,2.1).metrics.cloud).toBeGreaterThan(0);balance(start)})
  it('resilient autoscaling checks sooner and provisions integer instances',()=>{let s=prepared();s.equipmentLevels.cloud=0;s.equipmentLevels.cpu=1;s.equipmentLevels.memory=1;s.cloudProvisioned=1;s.totalServed=1e8;s.scaleTimer=0;s.provisioning={target:1,gpuTarget:s.aiProvisioned,remaining:0};s.policyCooldownUntil=0;const resilient=setPolicy(s,'autoscaling','resilient');const a=stepGame(s,5.2),b=stepGame(resilient,5.2);expect(a.cloudProvisioned).toBe(1);expect(b.cloudProvisioned).toBeGreaterThan(1);expect(Number.isInteger(b.cloudProvisioned)).toBe(true);expect(b.cloudProvisioned).toBeLessThanOrEqual(8)})
- it('incident and technology announcements do not block service',()=>{let s=full();s.nextIncidentAt=0;s=triggerIncident(s,'marketing');expect(getNextAnnouncement(s)).toBeDefined();const next=stepGame(s,1);expect(next.elapsed).toBeGreaterThan(s.elapsed);expect(next.totalServed).toBeGreaterThan(s.totalServed)})
- it('acknowledging an alert preserves a manual pause',()=>{let s=full();s.paused=true;s=acknowledgeAnnouncement(s,getNextAnnouncement(s)!.id);expect(s.paused).toBe(true);expect(stepGame(s,5)).toBe(s)})
+ it('major announcements suspend service until acknowledged without changing manual pause',()=>{let s=full();s.nextIncidentAt=0;s=triggerIncident(s,'marketing');expect(getNextAnnouncement(s)).toBeDefined();expect(stepGame(s,1)).toBe(s);const before=s.incident!.remaining;s=ack(s);const next=stepGame(s,1);expect(next.elapsed).toBeGreaterThan(s.elapsed);expect(next.incident!.remaining).toBeCloseTo(before-1);expect(next.paused).toBe(false)})
+ it('acknowledging an alert preserves a manual pause',()=>{let s=full();s.nextIncidentAt=0;s=triggerIncident(s,'marketing');s.paused=true;s=acknowledgeAnnouncement(s,getNextAnnouncement(s)!.id);expect(s.paused).toBe(true);expect(stepGame(s,5)).toBe(s)})
  it('fixed substeps give matching results for equivalent frame and speed inputs',()=>{const s=lab();const a=stepGame(s,4);let b=s;for(let i=0;i<40;i++)b=stepGame(b,.1);expect(a.cash).toBeCloseTo(b.cash,8);expect(a.totalServed).toBeCloseTo(b.totalServed,7);expect(stepGame({...s,speed:4},1).cash).toBeCloseTo(a.cash,8)})
  it('backup recovery shortens an outage without increasing healthy throughput',()=>{const s=full(),without={...s,upgrades:s.upgrades.filter(x=>x!=='backup')};expect(calculateMetrics(s).served).toBe(calculateMetrics(without).served);s.nextIncidentAt=0;without.nextIncidentAt=0;expect(triggerIncident(s,'hardware').incident!.total).toBeLessThan(triggerIncident(without,'hardware').incident!.total)})
 })
 
 describe('progression, launch, and saved companies',()=>{
  it('advances facility milestones from capabilities',()=>{let s=fund(lab());expect(getMilestone(s).era).toBe('workshop');for(const u of UPGRADES){s=purchaseUpgrade(s,u.id);if(u.id==='load_balancer')expect(getMilestone(s).era).toBe('rooftop');if(u.id==='autoscaling')expect(getMilestone(s).era).toBe('datacenter')}expect(getMilestone(s).era).toBe('ai')})
- it('a prepared launch passes and rewards once; poor reputation can retry',()=>{let s=prepared();expect(getChallengeReadiness(s).ready).toBe(true);s=stepGame(startChallenge(s),91);expect(s.challenge.result).toBe('passed');expect(s.achievementIDs.filter(x=>x==='launch')).toHaveLength(1);const rewards=s.revenue.rewards;s=stepGame(s,5);expect(s.revenue.rewards).toBe(rewards);let bad=prepared();bad.reputation=10;bad=stepGame(startChallenge(bad),91);expect(bad.challenge.result).toBe('failed');expect(startChallenge(bad)).toBe(bad);bad=stepGame(bad,31);expect(startChallenge(bad).challenge.active).toBe(true)})
+ it('a prepared launch passes and rewards once; poor reputation can retry',()=>{let s=prepared();expect(getChallengeReadiness(s).ready).toBe(true);s=stepGame(startChallenge(s),91);expect(s.challenge.result).toBe('passed');expect(s.achievementIDs.filter(x=>x==='launch')).toHaveLength(1);const rewards=s.revenue.rewards;s=stepGame(ack(s),5);expect(s.revenue.rewards).toBe(rewards);let bad=prepared();bad.reputation=10;bad=stepGame(startChallenge(bad),91);expect(bad.challenge.result).toBe('failed');expect(startChallenge(bad)).toBe(bad);bad=stepGame(ack(bad),31);expect(startChallenge(bad).challenge.active).toBe(true)})
  it('round trips complete state, manual pause and reports without offline earnings',()=>{const s=prepared();s.paused=true;const restored=loadGame(serializeGame(s))!;expect(restored).not.toBeNull();expect(restored.cash).toBe(s.cash);expect(restored.paused).toBe(true);expect(restored.revenue).toEqual(s.revenue);balance(restored)})
  it.each([1,2,3,4])('migrates version %i without losing funds or purchases',version=>{const s=full();const legacy={...s,version,cash:4321};if(version<3){legacy.equipmentLevels={...s.equipmentLevels};legacy.announcements=[]}const restored=loadGame(JSON.stringify(legacy))!;expect(restored).not.toBeNull();expect(restored.version).toBe(5);expect(restored.cash).toBe(4321);expect(restored.upgrades).toEqual(s.upgrades);balance(restored)})
  it('rejects malformed saves and tampered financial totals',()=>{const s=lab();for(const value of ['invalid','null',JSON.stringify({...s,cash:1e30}),JSON.stringify({...s,revenue:{...s.revenue,gross:-1}}),JSON.stringify({...s,cash:s.cash+100}),JSON.stringify({...s,equipmentLevels:{...s.equipmentLevels,cpu:-1}}),JSON.stringify({...s,provisioning:{target:1.5,gpuTarget:0,remaining:0}})])expect(loadGame(value)).toBeNull()})
  it('does not award achievements again after save restoration',()=>{const s=stepGame(purchaseEquipment(fund(lab()),'cpu'),1);const restored=loadGame(serializeGame(s))!;const again=stepGame(restored,.1);expect(again.revenue.rewards).toBe(s.revenue.rewards);expect(again.achievementIDs).toEqual(s.achievementIDs)})
  it('recommends the measured constraint rather than an unrelated purchase',()=>{const s=prepared();s.equipmentLevels.network=0;s.totalServed=1e7;const r=getRecommendation(s);expect(r.priority).toBe('capacity');expect(r.upgradeId).toBe('network')})
+ it('archives old notification backlog once and preserves the company',()=>{let s=full();s=purchaseEquipment(s,'cpu');s.announcements.push({id:`technology-${++s.announcementSequence}`,kind:'technology',title:'Old update',body:'Earlier upgrade',actionLabel:'Continue'});const old={...s,uiRevision:undefined};const restored=loadGame(JSON.stringify(old))!;expect(restored.uiRevision).toBe(2);expect(getNextAnnouncement(restored)).toBeUndefined();expect(restored.cash).toBe(s.cash);expect(restored.upgrades).toEqual(s.upgrades);expect(loadGame(serializeGame(restored))?.announcements).toEqual([])})
+ it('migrates an active incident with its remaining time and one new notice',()=>{let s=full();s.nextIncidentAt=0;s=ack(triggerIncident(s,'marketing'));s=stepGame(s,5);const old={...s,uiRevision:undefined};const restored=loadGame(JSON.stringify(old))!;expect(restored.incident!.remaining).toBeCloseTo(20);expect(restored.incident!.stats).toEqual(s.incident!.stats);expect(restored.announcements).toHaveLength(1);expect(getNextAnnouncement(restored)?.kind).toBe('incident');expect(stepGame(restored,10)).toBe(restored);expect(loadGame(serializeGame(restored))?.announcements).toHaveLength(1)})
+
 })
