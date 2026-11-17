@@ -2,15 +2,15 @@ import type { KeyboardEvent, ReactNode } from 'react'
 import type { GameState } from './sim/types'
 import {useSceneCamera} from './useSceneCamera'
 
-type Props={state:GameState;selected:string;setSelected:(id:string)=>void;focus?:string;compact?:boolean;highlight?:string}
+type Props={state:GameState;selected:string;setSelected:(id:string)=>void;focus?:string;focusKey?:number;compact?:boolean;highlight?:string}
 function Part({id,label,x,y,w,h,selected,onSelect,children}:{id:string;label:string;x:number;y:number;w:number;h:number;selected:string;onSelect:(id:string)=>void;children:ReactNode}){
  const key=(e:KeyboardEvent<SVGGElement>)=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();onSelect(id)}}
  return <g data-component-id={id} role="button" tabIndex={0} aria-label={`Inspect ${label}`} aria-pressed={selected===id} onClick={()=>onSelect(id)} onKeyDown={key} transform={`translate(${x} ${y})`} className={`interior-part ${selected===id?'selected':''}`}>
   {id==='motherboard'&&<rect data-component-id="virtualization" width={w} height={h} fill="transparent" pointerEvents="none"/>}<rect className="part-outline" x="-7" y="-7" width={w+14} height={h+14} fill="transparent" stroke="#4b667b" strokeWidth="2"/>{children}<text x="0" y={h+28} className="part-label">{label.toUpperCase()}</text>
  </g>
 }
-export default function ServerInterior({state,selected,setSelected,focus,compact=false,highlight}:Props){
- const {svgRef,viewBox}=useSceneCamera(1080,610,focus,compact)
+export default function ServerInterior({state,selected,setSelected,focus,focusKey,compact=false,highlight}:Props){
+ const {svgRef,viewBox}=useSceneCamera(1080,610,focus,compact,focusKey)
  const mapped=(id:string|undefined)=>id==='server'?'cpu':id==='virtualization'?'motherboard':id==='storage'?'ssd':id==='gateway'?'network':id
  const id=mapped(highlight??selected)??'cpu'
  return <section className={`interior-shell ${state.paused?'scene-paused':''}`} aria-label="Server interior" style={compact?{height:'100%',width:'100%',minHeight:0,overflow:'hidden'}:undefined}>

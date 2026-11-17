@@ -1,6 +1,6 @@
 # CloudLab
 
-CloudLab is a pixel-art infrastructure tycoon built with React, TypeScript, and Vite. Start with a borrowed server, learn to remove bottlenecks, expand into cloud services, and test your design on Launch Day.
+CloudLab is a pixel-art infrastructure game built with React, TypeScript, and Vite. Read the live monitor, identify a bottleneck, upgrade the right resource, and grow a reliable company through procedural levels.
 
 ## Run and verify
 
@@ -12,38 +12,50 @@ npm run build
 npm run test:e2e
 ```
 
-## Play the system
+## Monitor, diagnose, upgrade
 
-The desktop playfield fits the available window. The floating tuning console shows one part at a time: choose **Equipment** or **Technology**, then a component. Choosing CPU, Memory, Storage (SSD), or Network focuses its physical location inside the server. Cloud and GPU controls focus their remote service nodes. Clicking the scene also selects the corresponding controls without changing views.
+Click the workshop’s **Performance & Operations** monitor, or use its shortcut from any view. The projected dashboard stays live while you browse **Performance**, **Finance**, **Operations**, and **Events**. Performance shows incoming traffic, served percentage, the limiting resource, and a direct **Inspect upgrade** action. The graph contains the last 60 active seconds; it is not a decorative success animation.
 
-Each card provides a short purpose, physical specifications, the next upgrade, and its price. Missing prerequisites are links to the required component. **Learn more** keeps the conversion assumptions and deeper explanations available on separate pages. Upgrades show a local level change and specification-change badge in all three views. Rented resources show their startup state until they are ready.
+The floating tuning console shows one component at a time. Its game-styled **Equipment / Technology** chooser supports keyboard navigation and stays inside the desktop playfield. Select CPU, Memory, Storage (SSD), or Network to focus its physical location inside the server; cloud and GPU controls focus their remote service nodes. Clicking equipment directly preserves the current view.
 
-**Workshop** shows your facility and city, **Server Interior** shows the physical parts, and **Service Flow** shows requests, shared data, cache, cloud, and GPU routes. Facility artwork advances through workshop, rooftop, cloud operations, and AI milestones. Moving segments represent sampled traffic, not one sprite per request.
+Each component has a short purpose, physical specifications, upgrade price, and immediate local feedback. Missing prerequisites lead directly to the required component. **Learn more** keeps conversion assumptions on optional pages. **Workshop**, **Server Interior**, and **Service Flow** explain the physical equipment and service relationships without drawing one object for every fleet worker.
 
-The tutorial teaches by asking you to inspect, select, and upgrade real components. Required purchases are funded, traffic continues during guided actions, and explanations pause for reading. Replay preserves the live company. **Hint** opens a small bubble explaining the current constraint, or tells you everything is working well.
+Drag to pan, use trackpad scrolling to move the camera, and pinch or Ctrl-wheel to zoom. **+**, **−**, and **Fit** provide visible alternatives. Manual framing persists until Fit or explicit component navigation. A drag does not accidentally select or purchase a part.
 
-Major incidents, event results, technology acquisitions, and launch results use short popups. Reading pauses the simulation; Continue restores the previous manual pause state. Incident results distinguish actual net profit or loss from potential revenue that was never earned. History remains available from the menu.
+## Levels, recovery, and events
 
-## Money, time, and hardware
+A company level has fixed traffic and a work quota. Completing that quota while serving at least 98% of requests advances the level. At 1×, a healthy early level takes approximately 25 seconds. When the system falls behind, earned progress remains and demand does not continue increasing. CPU-heavy, data-heavy, and AI workloads gradually add resource tradeoffs; heavier work earns correspondingly higher fictional fees.
 
-All prices are fictional game prices. Completed standard responses earn **$4 per 1,000**, and AI responses earn **$12 per 1,000**. Rejected work earns nothing.
+Individual hardware has plausible limits. Further growth comes from additional servers, storage groups, network links, cloud workers, and GPU workers. **Budget Guard** warns about operating losses and reduces unused capacity rather than allowing idle rentals to create a debt spiral. Costs remain visible in the ledger; it does not invent revenue or delete owned equipment.
+
+Events occur at eligible fifth-level checkpoints, never overlap, and have a quiet period after resolution. The default event window is 75 seconds, with event-specific windows between 60 and 90 seconds. Event clocks measure active real time at every game speed. Pauses, blocking popups, hidden tabs, and closed pages stop those timers. The company may continue leveling during an event; overlapping checkpoints do not accumulate a backlog.
+
+The small trophy button opens **Achievements** and displays available rewards. Completing a checkpoint unlocks a reward; **Claim rewards** credits it once. Rewards are separate from customer earnings. Existing rewards that were already paid before migration are not paid again.
+
+## Money and time
+
+All prices are fictional game prices. Completed work earns revenue; rejected work earns nothing. More demanding profiles receive higher fees.
 
 **Available funds = opening funds + customer revenue + rewards + training grants − purchases − operating expenses.**
 
-The steady **Profit/min** badge is customer revenue minus operating expenses. Green means profit, red means loss, and zero is neutral. Purchases, rewards, and grants are separate transactions. Funds keep a fixed layout and update calmly; purchase deductions appear immediately. Running cloud and GPU instances incur costs even when idle. **Stop rentals** reduces those costs; debt is retained rather than silently discarded.
+The steady **Profit/min** badge and subdued receipts show customer revenue minus operating expenses. Green means profit, red means loss, and zero is neutral. Purchases, grants, and reward claims never appear as operating profit. Funds use a stable layout; purchase deductions appear immediately. Finance provides current rates, balance, Budget Guard status, and the detailed ledger.
 
-At 1×, one real second advances one simulated minute. The 2× and 4× controls accelerate that clock. Hardware and traffic rates use seconds, while financial rates use minutes. Paused, hidden, and closed pages produce no offline earnings.
+At 1×, one real second advances one simulated minute for service and financial calculations. The 2× and 4× controls accelerate that simulation; event reaction time remains an active real-time countdown such as `01:15`. Paused, hidden, and closed pages produce no offline earnings.
 
-CPU uses cores and GHz; RAM uses GiB; storage uses GiB, IOPS, and MiB/s; networking uses Mbps/Gbps; GPUs show count and VRAM. Explicit workload assumptions produce the displayed capacity estimates. GHz measures clock cycles, not a universal operations count. Virtualization partitions existing hardware with overhead, load balancing routes traffic without creating bandwidth, and additional compute remains constrained by shared data resources. Backups support restoration; healthy replicas and failover support availability.
+Hardware uses cores and GHz, GiB, IOPS, MiB/s, Mbps/Gbps, and GPU count/VRAM. Explicit workload assumptions derive service estimates. GHz measures cycles rather than a universal instruction or operation count. Virtualization partitions existing resources with overhead; load balancing routes traffic without creating bandwidth; shared data and network resources can constrain an expanded compute fleet.
 
-## Saves and accessibility
+## Learning and saves
 
-Progress is stored locally in the browser, including purchases, finances, achievements, tutorial progress, and manual pause. Existing version-five companies and older saves remain compatible. Legacy pending notifications are archived rather than replayed as a backlog. Historical reports remain accessible. Invalid imports leave the current company unchanged; pre-migration backups remain recoverable where available.
+The tutorial prompts real actions, provides required purchase funding, teaches the performance monitor and reward claims, and protects the live company during replay. **Hint** explains the current constraint or reassures the player that service is healthy. Major incident, technology, and result popups pause for reading and preserve the player’s manual pause state.
 
-The menu opens compact Finance, Operations, Achievements, History, Help, Save, and settings overlays. Longer information uses pages or tabs. Export a backup before resetting or clearing browser storage.
+The menu contains Help, Save, and settings. Finance, Operations, Events, and the trophy are directly accessible rather than hidden in that menu. Export a backup before resetting or clearing browser storage.
 
-The original SVG city, equipment, people, and signs share locally bundled pixel fonts; licenses are under `public/fonts/`. Controls support keyboard navigation and clear focus. Reduced motion retains static highlights and upgrade badges without camera motion. Sound is optional.
+Progress is stored locally in the browser. Existing companies migrate without losing cash, purchases, achievements, or reports. Migration avoids sudden workload jumps and retroactive payouts. Invalid imports leave the current company unchanged. Graph samples and historical notification bookkeeping stay bounded for long sessions.
 
-## Browser QA
+## Accessibility and QA
 
-Playwright tests the production build on localhost port 4173. Close unrelated servers on that port before running the suite. Chromium covers gameplay, guided actions, prerequisite navigation, popups, finances, saves, and upgrade feedback. Firefox and WebKit run desktop smoke checks. Responsive checks cover compact desktop windows through 1920×1080 and verify the scene, console, selectors, and overlays without page or panel scrolling. Screenshots are written to `test-results/`.
+The original SVG city, equipment, people, and signs share locally bundled pixel fonts; their licenses are under `public/fonts/`. Controls support keyboard navigation, clear focus, and reduced motion. Sound is optional.
+
+Playwright tests the production build on localhost port 4173. Close unrelated servers on that port before running the suite. Chromium covers gameplay, progression, dashboard operation, custom selectors, camera gestures, rewards, events, finances, and saves. Firefox and WebKit cover the desktop smoke and layout matrix. Responsive checks cover 780×600 through 1920×1080 and verify that views, selectors, dashboards, and overlays fit without page or panel scrolling. Screenshots are written to `test-results/`.
+
+Validation for the endless-game update: 84 unit tests pass, including an actual progression run through 10,000 levels with affordable recovery and ledger checks. The 54 browser scenarios cover Chromium gameplay and the five desktop sizes across Chromium, Firefox, and WebKit. A 60-active-second, 4× headless Chromium profile at 1440×900 recorded no long tasks; history stayed at 60 samples and receipts at three. A separate 90-view-change audit retained one camera listener per event and one connected scene SVG. These measurements describe the local QA environment rather than a performance guarantee for every device.

@@ -12,9 +12,9 @@ export type EquipmentId = 'cpu' | 'memory' | 'ssd' | 'network' | 'cloud' | 'ai'
 export type EquipmentDefinition = { id: EquipmentId; name: string; baseCost: number; increase: number; unlock?: UpgradeId }
 export type Announcement = { id: string; kind: 'incident' | 'technology' | 'achievement' | 'challenge' | 'report'; title: string; body: string; actionLabel: string; illustration?: string; reportId?: string; impact?: PurchaseImpact; tip?: string }
 export type LossStage = 'network' | 'compute' | 'memory' | 'storage' | 'ai'
-export type PurchaseImpact = { id: string; at: number; before: Metrics; after: Metrics; beforeLevel?:number; afterLevel?:number; quantity?:number; cost?:number }
+export type PurchaseImpact = { id: string; at: number; before: Metrics; after: Metrics; beforeLevel?:number; afterLevel?:number; quantity?:number; cost?:number; expansionPool?:FleetPool }
 export type EventStatistics = {
-  duration: number; standardRequests: number; aiRequests: number; served: number; dropped: number;
+  duration: number; durationSeconds?:number; standardRequests: number; aiRequests: number; served: number; dropped: number;
   gross: number; expenses: number; potentialGross: number; extraRequests: number;
   missedByStage: Record<LossStage, number>; partial: boolean
 }
@@ -56,10 +56,13 @@ export type ChallengeState = {
 export type Hardware = {
   cpuCores:number; cpuGHz:number; instructionsPerCycle:number; ramGiB:number; reservedRamGiB:number;
   storageGiB:number; storageUsedGiB:number; storageIOPS:number; storageMiBs:number; networkMbps:number;
-  gpuCount:number; gpuVRAMGiB:number; serverCount:number; cloudInstances:number; cloudInstanceCores:number; cloudInstanceRamGiB:number
+  gpuCount:number; gpuVRAMGiB:number; serverCount:number; cloudInstances:number; cloudInstanceCores:number; cloudInstanceRamGiB:number; storageGroupCount:number;networkLinkCount:number;unitStorageGiB:number;unitStorageIOPS:number;unitStorageMiBs:number;unitNetworkMbps:number
 }
 
+export type FleetPool = 'servers'|'storage'|'network'|'cloud'|'ai'
 export type Metrics = {
+  admittedStandard:number;admittedAI:number;eligibleCloudWork:number;workloadMix:{cpuHeavy:number;dataHeavy:number;ai:number};activeServers:number;standbyServers:number;standardPrice:number;aiPrice:number
+
   hardware: Hardware
   routes: {arrived:number;cache:number;origin:number;ai:number;rejected:number;pending:number}
   writeRateGiB:number
@@ -112,8 +115,9 @@ export type AdvisorRecommendation = {
 }
 
 export type GameState = {
-  version: 5
+  version: 6
   uiRevision?: 2
+  workloadOffset:number;companyLevel:number;levelProgress:number;levelQuota:number;fleet:{servers:number;storageGroups:number;networkLinks:number};budgetGuard:{enabled:boolean;lossSeconds:number;status:'healthy'|'warning'|'recovering'};claimedAchievementIDs:string[];claimedCheckpointLevel:number;eventCheckpoint:number;eventQuietSeconds:number;activeSeconds:number;aiLaunchLevel:number|null
   revenue: { gross: number; expenses: number; grants: number; purchases:number; rewards:number; opening:number }
   storageUsedGiB:number
   rentalsEnabled:boolean

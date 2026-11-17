@@ -1,9 +1,10 @@
+import {memo} from 'react'
 import type { KeyboardEvent, ReactNode } from 'react'
 import type { GameState, UpgradeId } from './sim/types'
 import { getEffectiveUpgrades } from './sim/engine'
 import {useSceneCamera} from './useSceneCamera'
 
-type Props = { state: GameState; selected: string; setSelected: (id: string) => void; flow: boolean; pulse?: string; beginner?: boolean; highlight?: string; earningPulse?:boolean; presentationPaused?:boolean; focus?:string; compact?:boolean }
+type Props = { state: GameState; selected: string; setSelected: (id: string) => void; flow: boolean; pulse?: string; beginner?: boolean; highlight?: string; earningPulse?:boolean; presentationPaused?:boolean; focus?:string; focusKey?:number; compact?:boolean; monitorSamples?:number[]; monitorStatus?:string }
 
 function Selectable({id,label,x,y,w=130,h=40,selected,setSelected,locked=false,pulse,children}:{id:string;label:string;x:number;y:number;w?:number;h?:number;selected:string;setSelected:(id:string)=>void;locked?:boolean;pulse?:string;children:ReactNode}) {
   const key=(e:KeyboardEvent<SVGGElement>)=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();setSelected(id)}}
@@ -11,18 +12,18 @@ function Selectable({id,label,x,y,w=130,h=40,selected,setSelected,locked=false,p
     {id==='server'&&['cpu','memory','ssd','virtualization'].map(alias=><rect key={alias} data-component-id={alias} x="0" y="0" width={w} height={h} fill="transparent" pointerEvents="none"/>)}<title>{label}{locked?' · not installed':' · select to inspect or upgrade'}</title>{children}<g className="machine-tag" transform="translate(0 -29)"><rect width={w} height="24"/><text x="8" y="17">{label.toUpperCase()}</text></g><rect className="machine-hit" x="-4" y="-32" width={w+8} height={h+36} fill="transparent"/>
   </g>
 }
-function Rack({x=0,y=0,w=130,h=210,rows=6,tone='#5ef0d1'}:{x?:number;y?:number;w?:number;h?:number;rows?:number;tone?:string}){
+const Rack=memo(function Rack({x=0,y=0,w=130,h=210,rows=6,tone='#5ef0d1'}:{x?:number;y?:number;w?:number;h?:number;rows?:number;tone?:string}){
  return <g transform={`translate(${x} ${y})`}><path d={`M0 0h${w}v${h}H0Z`} fill="#121627" stroke="#526179" strokeWidth="4"/><path d={`M${w} 0l12-10v${h}l-12 10Z`} fill="#080d19" stroke="#2b344e" strokeWidth="2"/><rect x="8" y="9" width={w-16} height={h-20} fill="#080e1c"/>{Array.from({length:rows},(_,i)=><g key={i} transform={`translate(14 ${17+i*(h-32)/rows})`}><rect width={w-28} height={(h-32)/rows-7} fill="#243147" stroke="#3b4b63"/><path d={`M8 7h${w-67}m-${w-67} 6h${w-67}`} stroke="#101928" strokeWidth="3"/>{[0,1,2].map(n=><rect key={n} x={w-51+n*7} y="7" width="3" height="3" fill={tone} className="equipment-led" style={{animationDelay:`${i*.2+n*.3}s`}}/>)}</g>)}<path d={`M10 ${h}v9m${w-20}-9v9`} stroke="#070c18" strokeWidth="9"/></g>
-}
-function Building({x,y,w,h,i}:{x:number;y:number;w:number;h:number;i:number}){
+})
+const Building=memo(function Building({x,y,w,h,i}:{x:number;y:number;w:number;h:number;i:number}){
  return <g><rect x={x} y={y} width={w} height={h} fill={['#17283b','#172035','#25223c','#122638'][i%4]} stroke="#33485d" strokeWidth="2"/><rect x={x+5} y={y+6} width={w-10} height={h-6} fill="url(#city-windows)"/><path d={`M${x-3} ${y}h${w+6}M${x+8} ${y-4}v-8h${w/3}v8`} stroke="#4f586f" strokeWidth="3" fill="none"/>{Array.from({length:Math.floor(h/54)},(_,n)=><path key={n} d={`M${x} ${y+36+n*54}h${w}`} stroke="#081729" strokeWidth="5"/>)}</g>
-}
-function Neon({x,y,w,text,color='#ff71b8',vertical=false}:{x:number;y:number;w:number;text:string;color?:string;vertical?:boolean}){
+})
+const Neon=memo(function Neon({x,y,w,text,color='#ff71b8',vertical=false}:{x:number;y:number;w:number;text:string;color?:string;vertical?:boolean}){
  const h=vertical?text.length*24+20:44
  return <g transform={`translate(${x} ${y})`} className="neon-sign" style={{color}}><path d={`M-12 9H0m-12 ${h-18}H0`} stroke="#60708a" strokeWidth="5"/><rect width={w} height={h} fill="#161c32" stroke="#4e3658" strokeWidth="4"/><rect x="5" y="5" width={w-10} height={h-10} fill="none" stroke={color} strokeWidth="2" className="neon-tube"/>{vertical?[...text].map((letter,i)=><text key={i} x={w/2} y={27+i*24} textAnchor="middle" fill={color} className="neon-letters">{letter}</text>):<text x={w/2} y="30" textAnchor="middle" fill={color} className="neon-letters">{text}</text>}</g>
-}
-export default function Workshop({state,selected,setSelected,flow,pulse,beginner,highlight,earningPulse,presentationPaused,focus,compact=false}:Props){
- const {svgRef,viewBox}=useSceneCamera(1280,720,focus,compact)
+})
+export default function Workshop({state,selected,setSelected,flow,pulse,beginner,highlight,earningPulse,presentationPaused,focus,focusKey,compact=false,monitorSamples,monitorStatus}:Props){
+ const {svgRef,viewBox}=useSceneCamera(1280,720,focus,compact,focusKey)
  const picked=highlight??selected
  const sceneSelected=['cpu','memory','ssd','virtualization'].includes(picked)?'server':picked
  const sceneHighlight=['cpu','memory','ssd','virtualization'].includes(highlight??'')?'server':highlight
@@ -32,6 +33,12 @@ export default function Workshop({state,selected,setSelected,flow,pulse,beginner
  const running=!state.paused&&!presentationPaused
  const props=(id:string,label:string,x:number,y:number,w=130,h=40,locked=false)=>({id,label,x,y,w,h,selected:sceneSelected,setSelected,locked,pulse:sceneHighlight===id?id:pulse})
  const tier=Math.min(5,state.equipmentLevels.cpu+state.equipmentLevels.memory+state.equipmentLevels.ssd)
+ const success=Math.max(0,Math.min(1,state.metrics.successRate))
+ const samples=monitorSamples?.length?monitorSamples:[success,success]
+ const graph=samples.map((sample,i)=>`${41+(i/Math.max(1,samples.length-1))*140},${22-Math.max(0,Math.min(1,sample))*34}`).join(' ')
+ const monitorColor=success>=.98?'#74f9d5':success>=.8?'#f2c37d':'#f399ad'
+ const fleet=(state as GameState & {fleet?:{servers?:number}}).fleet?.servers??(has('server2')?2:1)
+ const monitorKey=(e:KeyboardEvent<SVGGElement>)=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();setSelected('dashboard')}}
  return <div className={`workshop-stage era-${era} ${earningPulse?'billing-active':''} ${!running?'scene-paused':''} ${beginner?'beginner-workshop':''}`} data-era={era} aria-label="CloudLab workshop" style={compact?{height:'100%',width:'100%',minHeight:0,overflow:'hidden'}:undefined}>
   <svg ref={svgRef} className="workshop-room" viewBox={viewBox} preserveAspectRatio="xMidYMid meet" style={compact?{width:'100%',height:'100%',minHeight:0,maxHeight:'none'}:undefined} role="group" aria-label={`${dc?'Data-center operations room':rooftop?'Rooftop server facility':'Street-level server workshop'} overlooking a neon city`} shapeRendering="crispEdges">
    <defs>
@@ -75,11 +82,17 @@ export default function Workshop({state,selected,setSelected,flow,pulse,beginner
    <path d="M704 119h520v84M713 132h498v72" stroke="#3e455a" strokeWidth="7" fill="none"/><path d="M704 119h520" stroke="#a18196" strokeWidth="2"/>
    <g><rect x="825" y="17" width="227" height="15" fill="#070d1e"/><rect x="833" y="30" width="210" height="6" fill="#ffd590"/><path d="m845 39-154 515h501L1034 39Z" fill="#ffc17a" opacity=".035"/></g>
    <g transform="translate(66 499)"><rect x="0" y="47" width="560" height="14" fill="#aa7255"/><rect x="0" y="61" width="560" height="16" fill="#50394b"/><path d="M20 77v101m509-101v101" stroke="#121a2a" strokeWidth="17"/><path d="M25 78v91m500-91v91" stroke="#456075" strokeWidth="3"/>
-    <rect x="24" y="-66" width="175" height="111" fill="#111a2a" stroke="#52617a" strokeWidth="5"/><rect x="32" y="-58" width="159" height="92" fill="#0b2e3a"/><path d="m41 14 18-22 18 8 24-27 20 12 23-31 17 11 20-22" stroke="#74f9d5" strokeWidth="3" fill="none"/><path d="M41 24h140M42-44h49M42-36h28" stroke="#3b7b83" strokeWidth="2"/><text x="41" y="-22" className="monitor-small">SERVICE / LIVE</text><path d="M110 46v10" stroke="#3c465d" strokeWidth="13"/>
+    <g className={`monitor-hotspot ${highlight==='dashboard'?'task-highlight':''}`} data-component-id="dashboard" role="button" tabIndex={0} aria-label="Open Performance & Operations" onClick={()=>setSelected('dashboard')} onKeyDown={monitorKey}>
+     <title>{monitorStatus??`${Math.round(success*100)}% served · open live Performance & Operations`}</title><text x="24" y="-79" className="monitor-label">PERFORMANCE / OPS ↗</text>
+     <rect className="monitor-frame" x="24" y="-66" width="175" height="111" fill="#111a2a" strokeWidth="5"/><rect x="32" y="-58" width="159" height="92" fill="#0b2e3a"/><polyline points={graph} stroke={monitorColor} strokeWidth="3" fill="none"/>
+     <path d="M41 25h140M42-48h30" stroke="#3b7b83" strokeWidth="2"/><text x="41" y="-30" className="monitor-small" style={{fill:monitorColor}}>{Math.round(success*100)}% SERVED / LIVE</text><path d="M110 46v10" stroke="#3c465d" strokeWidth="13"/>
+     <rect className="monitor-hit" x="21" y="-90" width="181" height="140" fill="transparent"/>
+    </g>
     <rect x="241" y="-43" width="144" height="88" className="billing-terminal" fill="#111c2e" stroke="#5a8b8a" strokeWidth="4"/><rect x="248" y="-36" width="130" height="69" fill="#123333"/><text x="259" y="-18" className="billing-label">RESPONSE / BILLING</text><path d="m260 7 10 10 18-23" stroke="#78f9c9" fill="none" strokeWidth="4"/><text x="323" y="23" className="billing-dollar">$</text><rect x="364" y="37" width="7" height="4" className="billing-led" fill="#72f8cd"/><path d="M310 46v10" stroke="#3b465c" strokeWidth="13"/>
     <path d="M45 67h135m75 0h115" stroke="#201d32" strokeWidth="5"/><rect x="438" y="17" width="24" height="29" fill="#c6b99c"/><path d="M462 23h10v16h-10" stroke="#c6b99c" fill="none" strokeWidth="5"/><text x="443" y="34" className="mug-label">209</text><path d="M443 8v-15m11 14v-17" stroke="#bcb5b8" strokeOpacity=".3" strokeWidth="2"/>
    </g>
    <Selectable {...props('server','Server 01',740,291,150,259)}><Rack w={150} h={259} rows={Math.min(8,4+tier)}/><path d="M22 255h106" stroke="#68f3d3" strokeWidth="2"/></Selectable>
+   {fleet>2&&<g transform="translate(741 552)"><rect width="148" height="20" fill="#16333b"/><text x="7" y="15" className="fleet-count">FLEET ×{new Intl.NumberFormat(undefined,{notation:'compact',maximumFractionDigits:1}).format(fleet)}</text></g>}
    <Selectable {...props('server2','Server 02',930,312,130,238,!has('server2'))}><Rack h={238} rows={6} tone="#b395ff"/></Selectable>
    <Selectable {...props('ai','GPU Pool',1104,347,112,203,!has('ai'))}><rect width="112" height="203" fill="#17213b" stroke="#a87fbc" strokeWidth="3" strokeDasharray="5 4"/><rect x="9" y="9" width="94" height="179" fill="#102435"/>{[0,1].map(i=><g key={i} transform={`translate(56 ${62+i*73})`}><circle r="28" fill="#2b2545" stroke="#9c70b3" strokeWidth="3"/><g className="cooling-fan"><path d="M-18 0h36M0-18v36m-13-13 26 26m-26 0 26-26" stroke="#bb7fc4" strokeWidth="6"/></g><circle r="7" fill="#e3b0e2"/></g>)}<text x="15" y="26" className="equipment-label">REMOTE VIEW</text><text x="9" y="224" className="equipment-label" fill="#ec98dc">{ai?'RENTED · REMOTE':'FUTURE CAPABILITY'}</text></Selectable>
    <Selectable {...props('network','Network',726,183,150,61)}><rect width="150" height="61" fill="#27374d" stroke="#62788d" strokeWidth="3"/><rect x="9" y="10" width="131" height="30" fill="#101e30"/>{Array.from({length:8},(_,i)=><rect key={i} x={16+i*15} y="18" width="8" height="12" fill="#46bcb0"/>)}<path d="M16 50h117" stroke="#506a7d" strokeWidth="3"/></Selectable>
@@ -91,7 +104,7 @@ export default function Workshop({state,selected,setSelected,flow,pulse,beginner
    <g className="room-cables"><path d="M802 244V260H812V280M810 552v22h185V552m-185 22v25M1180 552v33h-173v14" stroke="#091121" strokeWidth="9" fill="none"/><path d="M802 244V260H812V280M810 552v22h185V552" stroke="#497d89" strokeWidth="3" fill="none"/></g>
    {flow&&running&&state.metrics.served>0&&<g className="scene-flow" aria-hidden="true"><path d="M802 244V260H812V280"/><rect x="798" y="247" width="7" height="7" fill="#75ffe0" className="workshop-data-packet"/></g>}
    <g className="pixel-person" transform="translate(628 477)"><path d="M10 0h17v8H10Z" fill="#242033"/><rect x="12" y="8" width="13" height="14" fill="#c98a70"/><path d="M8 23h21v37H6Z" fill="#4e455f"/><path d="M11 31h14v21H11Z" fill="#94605e"/><path d="M8 60h9v35H7m14-35h9v35h-9" fill="#172437"/><path d="M3 95h16m1 0h15" stroke="#0b1527" strokeWidth="6"/><path d="M7 25 2 59h8m18-34 7 32h-9" fill="#41415b"/></g>
-   <g className="room-sticker"><rect x="58" y="671" width="271" height="25" fill="#12323a"/><text x="68" y="688">NO COFFEE ON RACKS / EST. 209</text></g>
+
    <text x="718" y="696" className="facility-readout">{ai?'04 / AI SERVICE ONLINE':dc?'03 / CLOUD OPERATIONS':rooftop?'02 / ROOFTOP FACILITY':'01 / BORROWED SERVER, BIG IDEAS'}</text>
    {highlight&&!compact&&<text x="45" y="38" className="equipment-label" fill="#9ef1c9">TRAINING TARGET / {highlight.toUpperCase()}</text>}
   </svg>

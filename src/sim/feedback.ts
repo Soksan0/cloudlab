@@ -1,4 +1,3 @@
-import {STANDARD_PRICE,AI_PRICE} from './hardware'
 import type { EquipmentId, EventStatistics, LossStage, Metrics, PurchaseImpact, UpgradeId } from './types'
 
 export const STAGES: LossStage[] = ['network','compute','memory','storage','ai']
@@ -24,11 +23,11 @@ export const EVENT_STORIES = {
   bot:{title:'Someone brought a bot army.',body:'Automated traffic is crowding your gateway and reducing usable ingress.',tip:'Firewall protection filters the attack. Strict mode trades CPU for stronger filtering.'},
   billing:{title:'The cloud bill just landed.',body:'Burst pricing has tripled the cost of managed capacity and cloud requests.',tip:'Economy autoscaling carries less idle capacity. Keep an eye on net income.'},
 }
-export const emptyEventStats = (partial=false): EventStatistics => ({duration:0,standardRequests:0,aiRequests:0,served:0,dropped:0,gross:0,expenses:0,potentialGross:0,extraRequests:0,missedByStage:{network:0,compute:0,memory:0,storage:0,ai:0},partial})
-export function integrateEvent(stats:EventStatistics,m:Metrics,dt:number,extraDemand:number) {
-  stats.duration+=dt;stats.standardRequests+=m.standardDemand*dt*60;stats.aiRequests+=m.aiDemand*dt*60
+export const emptyEventStats = (partial=false): EventStatistics => ({duration:0,durationSeconds:0,standardRequests:0,aiRequests:0,served:0,dropped:0,gross:0,expenses:0,potentialGross:0,extraRequests:0,missedByStage:{network:0,compute:0,memory:0,storage:0,ai:0},partial})
+export function integrateEvent(stats:EventStatistics,m:Metrics,dt:number,extraDemand:number,realDt=dt) {
+  stats.duration+=dt;stats.durationSeconds=(stats.durationSeconds??0)+realDt;stats.standardRequests+=m.standardDemand*dt*60;stats.aiRequests+=m.aiDemand*dt*60
   stats.served+=m.served*dt*60;stats.dropped+=m.dropped*dt*60;stats.gross+=m.gross*dt;stats.expenses+=m.expenses*dt
-  stats.potentialGross+=(m.standardDemand*STANDARD_PRICE+m.aiDemand*AI_PRICE)*dt*60;stats.extraRequests+=Math.max(0,extraDemand)*dt*60
+  stats.potentialGross+=(m.standardDemand*m.standardPrice+m.aiDemand*m.aiPrice)*dt*60;stats.extraRequests+=Math.max(0,extraDemand)*dt*60
   for(const stage of STAGES) stats.missedByStage[stage]+=m.missedRevenue[stage]*dt
 }
 export const equipmentMetric = (id:EquipmentId,m:Metrics) => id==='cpu'?m.compute:id==='ssd'?m.storage:id==='ai'?m.aiCapacity:m[id]

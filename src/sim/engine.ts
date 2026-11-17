@@ -1,7 +1,7 @@
-import { getHardware, WORKLOAD, STANDARD_PRICE, AI_PRICE, MAX_LEVELS } from './hardware'
+import { getHardware, WORKLOAD, STANDARD_PRICE, AI_PRICE, MAX_LEVELS, levelDemand,quotaForLevel,workloadMix } from './hardware'
 export {getHardware,hardwareSummary,getHardwareExplanation,getMilestone,STANDARD_PRICE,AI_PRICE} from './hardware'
 import { UPGRADES, upgradeById } from './upgrades'
-import type { AchievementDefinition, AdvisorRecommendation, Announcement, EquipmentDefinition, EquipmentId, GameState, Incident, IncidentKind, Metrics, PolicyState, UpgradeId } from './types'
+import type { AchievementDefinition, AdvisorRecommendation, Announcement, EquipmentDefinition, EquipmentId, GameState, Incident, IncidentKind, Metrics, PolicyState, UpgradeId,FleetPool } from './types'
 import { emptyEventStats, integrateEvent, EVENT_STORIES, STAGES, TECHNOLOGY_TIPS } from './feedback'
 
 export const EQUIPMENT: EquipmentDefinition[] = [
@@ -53,7 +53,7 @@ export const getNextAnnouncement = (s: GameState): Announcement | undefined => {
 export const acknowledgeAnnouncement = (state: GameState, id: string) => {
   if (!state.announcements.some(a => a.id === id) || state.acknowledgedAnnouncements.includes(id)) return state
   const s = structuredClone(state)
-  s.acknowledgedAnnouncements.push(id)
+  s.acknowledgedAnnouncements = []
   s.announcements = s.announcements.filter(a => a.id !== id)
   return s
 }
@@ -62,14 +62,56 @@ const achieved = (s: GameState): string[] => {
   return [levels >= 1 ? 'first-equipment' : '',s.totalServed >= 100 ? 'requests-100' : '',levels >= 5 ? 'equipment-5' : '',s.stableServiceMinutes >= 30 ? 'stable-30' : '',owned(s,'virtualization') ? 'virtualization' : '',owned(s,'server2') ? 'second-server' : '',s.incidentsRecovered >= 1 ? 'first-recovery' : '',owned(s,'cloud') ? 'cloud' : '',s.aiServed >= 100 ? 'ai-100' : '',s.completed ? 'launch' : ''].filter(Boolean)
 }
 const awardAchievements = (s: GameState) => {
-  if (training(s)) return
+  if (training(s)&&s.tutorial.replay) return
   for (const id of achieved(s)) {
     if (s.achievementIDs.includes(id)) continue
     const achievement = ACHIEVEMENTS.find(a => a.id === id)!
-    s.achievementIDs.push(id); s.cash += achievement.reward; s.revenue.rewards += achievement.reward
-    addLog(s, `${achievement.name} achievement: +$${achievement.reward}.`, 'good')
+    s.achievementIDs.push(id)
+    addLog(s, `${achievement.name} complete. Claim $${achievement.reward} from the trophy.`, 'good')
   }
 }
+export const getClaimableRewards=(s:GameState)=>{
+ if(s.tutorial.status==='active'&&s.tutorial.replay&&s.tutorial.step===9)return {count:1,amount:100}
+ const unclaimed=ACHIEVEMENTS.filter(a=>s.achievementIDs.includes(a.id)&&!s.claimedAchievementIDs.includes(a.id))
+ const end=Math.floor((s.companyLevel-1)/5),start=Math.floor(s.claimedCheckpointLevel/5),checkpoints=Math.max(0,end-start)
+ return {count:unclaimed.length+checkpoints,amount:unclaimed.reduce((sum,a)=>sum+a.reward,0)+checkpoints*100+50*(end*(end+1)-start*(start+1))/2}
+}
+export const claimRewards=(state:GameState):GameState=>{
+ if(state.tutorial.status==='active'&&state.tutorial.replay){if(state.tutorial.step!==9)return state;const s=structuredClone(state);moveTutorial(s,10);s.metrics=calculateMetrics(s);return s}
+ const s=structuredClone(state);awardAchievements(s);const claim=getClaimableRewards(s)
+ if(!claim.count)return state
+ s.cash+=claim.amount;s.revenue.rewards+=claim.amount;s.claimedAchievementIDs=[...s.achievementIDs];s.claimedCheckpointLevel=Math.floor((s.companyLevel-1)/5)*5
+ addLog(s,`${claim.count} reward${claim.count===1?'':'s'} claimed: +$${claim.amount.toFixed(0)}.`,'good')
+ if(s.tutorial.status==='active'&&s.tutorial.step===9)moveTutorial(s,10)
+ s.metrics=calculateMetrics(s);return s
+}
+export const setBudgetGuard=(state:GameState,enabled:boolean)=>{if(state.budgetGuard.enabled===enabled)return state;const s=structuredClone(state);s.budgetGuard={enabled,lossSeconds:0,status:'healthy'};s.metrics=calculateMetrics(s);return s}
+export const getExpansionQuote=(s:GameState,pool:FleetPool,quantity:1|'max'=1)=>{
+ const definition={servers:{base:1000,count:s.fleet.servers,unlock:'load_balancer'},storage:{base:600,count:s.fleet.storageGroups,unlock:''},network:{base:300,count:s.fleet.networkLinks,unlock:''},cloud:{base:800,count:1+s.equipmentLevels.cloud,unlock:'cloud'},ai:{base:1200,count:1+s.equipmentLevels.ai,unlock:'ai'}}[pool]
+ if(!definition)return {count:0,cost:0,nextCost:0,available:false,reason:'Unknown fleet pool'}
+ const price=(count:number)=>Math.ceil(definition.base*(count*(1+.02*Math.max(0,definition.count-1))+.01*count*(count-1)))
+ const nextCost=price(1)
+ if(training(s))return {count:0,cost:nextCost,nextCost,available:false,reason:'Finish the tutorial before expanding.'}
+ if(definition.unlock&&!owned(s,definition.unlock as UpgradeId))return {count:0,cost:nextCost,nextCost,available:false,reason:`Unlock ${upgradeById[definition.unlock].name} first.`}
+ let count=1
+ if(quantity==='max'){let low=0,high=1;while(price(high)<=s.cash&&high<1e9)high*=2;while(low+1<high){const mid=Math.floor((low+high)/2);if(price(mid)<=s.cash)low=mid;else high=mid}count=low}
+ const cost=price(count),available=count>0&&Number.isSafeInteger(definition.count+count)&&Number.isFinite(cost)&&cost<=s.cash
+ return {count,cost:count?cost:nextCost,nextCost,available,reason:available?'Ready':`Need $${Math.max(0,Math.ceil(nextCost-s.cash)).toLocaleString()} more`}
+}
+export const expandFleet=(state:GameState,pool:FleetPool,quantity:1|'max'=1)=>{
+ const quote=getExpansionQuote(state,pool,quantity);if(!quote.available)return state
+ const s=structuredClone(state),id=pool==='servers'?'server2':pool==='storage'?'ssd':pool==='network'?'network':pool
+ const before=pool==='servers'?s.fleet.servers:pool==='storage'?s.fleet.storageGroups:pool==='network'?s.fleet.networkLinks:1+s.equipmentLevels[pool]
+ s.cash-=quote.cost;s.revenue.purchases+=quote.cost
+ if(pool==='servers')s.fleet.servers+=quote.count
+ else if(pool==='storage')s.fleet.storageGroups+=quote.count
+ else if(pool==='network')s.fleet.networkLinks+=quote.count
+ else{s.equipmentLevels[pool]+=quote.count;if(s.rentalsEnabled)s.provisioning={target:Math.max(s.cloudProvisioned,s.provisioning.target)+(pool==='cloud'?quote.count:0),gpuTarget:Math.max(s.aiProvisioned,s.provisioning.gpuTarget)+(pool==='ai'?quote.count:0),remaining:2}}
+ addLog(s,`Expanded ${pool} pool by ${quote.count}.`,'good');awardAchievements(s);s.metrics=calculateMetrics(s)
+ s.lastPurchase={id,at:s.elapsed,before:calculateMetrics(state),after:s.metrics,beforeLevel:before,afterLevel:before+quote.count,quantity:quote.count,cost:quote.cost,expansionPool:pool}
+ return s
+}
+
 const equipmentPrice = (id: EquipmentId, level: number) => {
   let price = equipmentById[id].baseCost
   for (let i=0;i<level && Number.isFinite(price);i++) price = Math.ceil(price * 1.35)
@@ -78,7 +120,7 @@ const equipmentPrice = (id: EquipmentId, level: number) => {
 export const getEquipmentQuote = (s: GameState, id: EquipmentId, quantity: 1 | 'max' = 1) => {
   const item = equipmentById[id]
   if (!item) return {count:0,cost:0,increase:0,nextCost:0,available:false,reason:'Unknown equipment'}
-  const nextCost = equipmentPrice(id,s.equipmentLevels[id])
+  const nextCost = equipmentPrice(id,Math.min(s.equipmentLevels[id],MAX_LEVELS[id]))
   if(s.tutorial.status==='active' && s.tutorial.replay){
     const available=s.tutorial.phase==='action'&&getTutorialLesson(s).requiredUpgrade===id
     return {count:available?1:0,cost:0,increase:available?item.increase:0,nextCost:0,available,reason:available?'Training upgrade — no charge':'Follow the highlighted tutorial action.'}
@@ -105,11 +147,10 @@ export const purchaseEquipment = (state: GameState, id: EquipmentId, quantity: 1
   s.cash -= quote.cost; s.revenue.purchases += quote.cost; s.equipmentLevels[id] += quote.count
   if (id !== 'network' && !owned(s,id)) { s.upgrades.push(id); s.upgradeTimes[id] = s.elapsed }
   if ((id === 'cloud' || id === 'ai') && s.rentalsEnabled) {
-    s.provisioning={target:Math.min(8,Math.max(s.cloudProvisioned,s.provisioning.target)+(id==='cloud'?quote.count:0)),gpuTarget:Math.min(4,Math.max(s.aiProvisioned,s.provisioning.gpuTarget)+(id==='ai'?quote.count:0)),remaining:2}
+    s.provisioning={target:Math.max(s.cloudProvisioned,s.provisioning.target)+(id==='cloud'?quote.count:0),gpuTarget:Math.max(s.aiProvisioned,s.provisioning.gpuTarget)+(id==='ai'?quote.count:0),remaining:2}
   }
-  if (id === 'ssd' && s.equipmentLevels.ssd === 1 && !training(s)) queueIncident(s,'marketing')
   addLog(s,`${equipmentById[id].name}: ${quote.count} upgrade${quote.count===1?'':'s'} installed${id==='cloud'||id==='ai'?'; rental capacity starts in 2 minutes':''}.`, 'good')
-  if (training(s)) moveTutorial(s,s.tutorial.step+1)
+  if (training(s)) {moveTutorial(s,s.tutorial.step+1);awardAchievements(s)}
   else awardAchievements(s)
   s.metrics = calculateMetrics(s)
   s.lastPurchase = {id,at:s.elapsed,before:calculateMetrics(state),after:s.metrics,beforeLevel:state.equipmentLevels[id],afterLevel:s.equipmentLevels[id],quantity:quote.count,cost:quote.cost}
@@ -125,14 +166,14 @@ export const previewEquipmentImpact = (state:GameState,id:EquipmentId,count=1) =
   }
   const s={...state,equipmentLevels:{...state.equipmentLevels,[id]:Math.min(MAX_LEVELS[id],state.equipmentLevels[id]+count)},upgrades:[...state.upgrades]}
   if(id!=='network'&&!owned(s,id))s.upgrades.push(id)
-  if(id==='cloud'&&s.rentalsEnabled)s.cloudProvisioned=Math.min(8,Math.max(s.cloudProvisioned,s.provisioning.target)+Math.min(count,MAX_LEVELS[id]-state.equipmentLevels[id]))
-  if(id==='ai'&&s.rentalsEnabled)s.aiProvisioned=Math.min(4,Math.max(s.aiProvisioned,s.provisioning.gpuTarget)+Math.min(count,MAX_LEVELS[id]-state.equipmentLevels[id]))
+  if(id==='cloud'&&s.rentalsEnabled)s.cloudProvisioned=Math.max(s.cloudProvisioned,s.provisioning.target)+Math.min(count,MAX_LEVELS[id]-state.equipmentLevels[id])
+  if(id==='ai'&&s.rentalsEnabled)s.aiProvisioned=Math.max(s.aiProvisioned,s.provisioning.gpuTarget)+Math.min(count,MAX_LEVELS[id]-state.equipmentLevels[id])
   return {id,at:state.elapsed,before:calculateMetrics(state),after:calculateMetrics(s)}
 }
 
 export const createInitialState = (): GameState => {
   const state: GameState = {
-    version: 5, uiRevision:2, storageUsedGiB:32,rentalsEnabled:true,provisioning:{target:0,gpuTarget:0,remaining:0}, revenue:{opening:25,gross:0,expenses:0,grants:0,rewards:0,purchases:0},lastPurchase:null,eventReports:[], cash: 25, reputation: 60, elapsed: 0, totalServed: 0, paused: true, speed: 1,
+    version: 6, uiRevision:2, workloadOffset:0,companyLevel:1,levelProgress:0,levelQuota:quotaForLevel(1),fleet:{servers:1,storageGroups:1,networkLinks:1},budgetGuard:{enabled:true,lossSeconds:0,status:'healthy'},claimedAchievementIDs:[],claimedCheckpointLevel:0,eventCheckpoint:0,eventQuietSeconds:0,activeSeconds:0,aiLaunchLevel:null, storageUsedGiB:32,rentalsEnabled:true,provisioning:{target:0,gpuTarget:0,remaining:0}, revenue:{opening:25,gross:0,expenses:0,grants:0,rewards:0,purchases:0},lastPurchase:null,eventReports:[], cash: 25, reputation: 60, elapsed: 0, totalServed: 0, paused: true, speed: 1,
     equipmentLevels: {cpu:0,memory:0,ssd:0,network:0,cloud:0,ai:0}, aiServed:0,stableServiceMinutes:0,incidentsRecovered:0,achievementIDs:[],announcements:[],acknowledgedAnnouncements:[],announcementSequence:0,
     upgrades: [], policies: { loadBalancer: 'efficiency', firewall: 'balanced', autoscaling: 'economy' },
     policyCooldownUntil: 0, tutorialStep: 0, tutorialComplete: false,
@@ -147,137 +188,94 @@ export const createInitialState = (): GameState => {
   return state
 }
 
-const demandFor = (s: GameState) => {
-  if (training(s)) return s.tutorial.step<=1?25:s.tutorial.step<=4?55:60
-  // Successful completed service, rather than hardware purchases or elapsed time, grows the customer base.
-  let demand=(45+Math.sqrt(s.totalServed/600)*1.8)*(.70+s.reputation/200)
-  if(s.incident?.kind==='marketing')demand*=1.5
-  if(s.challenge.active)demand*=2
-  return demand
+const demandFor=(s:GameState)=>{
+ if(training(s))return s.tutorial.step<=1?25:s.tutorial.step<=3?55:60
+ let demand=levelDemand(s.companyLevel)
+ if(s.incident?.kind==='marketing')demand*=s.companyLevel<10?1.3:1.5
+ if(s.challenge.active)demand*=2
+ return demand
 }
 
 export const getEffectiveUpgrades = (s: GameState): UpgradeId[] => {
   if (!training(s) || !s.tutorial.replay) return s.upgrades
   return (['cpu', 'memory', 'ssd'] as const).filter((_, index) => {
-    const lesson = index + 3
+    const lesson = [3,6,7][index]
     return s.tutorial.step > lesson || (s.tutorial.step === lesson && (s.tutorial.phase === 'demo' || s.tutorial.demonstrated))
   })
 }
 
-export const calculateMetrics = (state: GameState): Metrics => {
-  const effective=getEffectiveUpgrades(state)
-  const s=training(state)&&state.tutorial.replay?{...state,upgrades:effective,equipmentLevels:{cpu:effective.includes('cpu')?1:0,memory:effective.includes('memory')?1:0,ssd:effective.includes('ssd')?1:0,network:0,cloud:0,ai:0},storageUsedGiB:32,incident:null}:state
-  const h=getHardware(s), w=WORKLOAD
-  if(training(s))h.networkMbps=1000 // Loaned tutorial uplink isolates the three hardware demonstrations.
-  const demand=demandFor(s),aiShare=owned(s,'ai')?(s.challenge.active?.35:.18):0
-  const aiDemand=demand*aiShare,standardDemand=demand-aiDemand
-  let activeServers=owned(s,'server2')&&owned(s,'load_balancer')?(s.policies.loadBalancer==='redundancy'?1:2):1
-  if(s.incident?.kind==='hardware')activeServers=owned(s,'server2')&&owned(s,'load_balancer')?1:0
-  const overhead=owned(s,'virtualization')?.95:1
-  const strict=owned(s,'security')&&s.policies.firewall==='strict'?.92:1
-  const localCompute=activeServers*h.cpuCores*h.cpuGHz*1e9/w.instructions*overhead*strict
-  const localMemory=activeServers*Math.floor(Math.max(0,h.ramGiB-h.reservedRamGiB-(owned(s,'virtualization')?.25:0))*1024/w.memoryMiB)/w.residenceSeconds
-  const cloud=h.cloudInstances*h.cloudInstanceCores*2.8e9/w.instructions*.95
-  const compute=localCompute+cloud
-  const memory=localMemory+h.cloudInstances*Math.floor((h.cloudInstanceRamGiB-1)*1024/w.memoryMiB)/w.residenceSeconds
-  let network=h.networkMbps*1e6/(w.networkKiB*1024*8)
-  if(s.incident?.kind==='bot')network*=1-.35*(1-(owned(s,'security')?(s.policies.firewall==='strict'?.9:.7):0))
-  const storage=Math.min(h.storageIOPS/w.operations,h.storageMiBs/w.ioMiB)
-  const aiCapacity=h.gpuCount*(h.gpuVRAMGiB>=w.modelVRAMGiB?1/w.gpuSeconds:0)
-  let standard=standardDemand,ai=aiDemand,standardWrites=standard*w.writeFraction,aiWrites=ai*w.writeFraction
-  const losses={network:0,compute:0,memory:0,storage:0,ai:0},missedRevenue={network:0,compute:0,memory:0,storage:0,ai:0}
-  const restrict=(stage:keyof typeof losses,ratio:number)=>{const r=clamp(ratio,0,1),lostStandard=standard*(1-r),lostAI=ai*(1-r);losses[stage]+=lostStandard+lostAI;missedRevenue[stage]+=(lostStandard*STANDARD_PRICE+lostAI*AI_PRICE)*60;standard*=r;ai*=r;standardWrites*=r;aiWrites*=r}
-  const networkLoad=standard+ai*(w.aiNetworkKiB/w.networkKiB)
-  restrict('network',network/Math.max(.000001,networkLoad))
-  const cacheHits=owned(s,'cache')?standard*(1-w.writeFraction)*.35:0
-  standard-=cacheHits
-  if(h.storageUsedGiB>=h.storageGiB-.000000001){
-    losses.storage+=standardWrites+aiWrites;missedRevenue.storage+=(standardWrites*STANDARD_PRICE+aiWrites*AI_PRICE)*60;standard-=standardWrites;ai-=aiWrites;standardWrites=0;aiWrites=0
-  }
-  const appDemand=standard+ai*2
-  restrict('compute',compute/Math.max(.000001,appDemand))
-  const memoryLoad=standard+ai*2
-  restrict('memory',memory/Math.max(.000001,memoryLoad))
-  const appProcessed=standard+ai*2
-  const ioLoad=standard+ai*(w.aiOperations/w.operations)
-  const ioBytes=standard*w.ioMiB+ai*w.aiIoMiB
-  restrict('storage',Math.min(h.storageIOPS/Math.max(.000001,standard*w.operations+ai*w.aiOperations),h.storageMiBs/Math.max(.000001,ioBytes)))
-  const gpuLost=Math.max(0,ai-aiCapacity);losses.ai+=gpuLost;missedRevenue.ai+=gpuLost*AI_PRICE*60;const aiRatio=ai>0?(ai-gpuLost)/ai:0;ai-=gpuLost;aiWrites*=aiRatio
-  const served=cacheHits+standard+ai,dropped=Math.max(0,demand-served),successRate=served/Math.max(.001,demand)
-  const onPrem=Math.min(localCompute,localMemory),onPremUsed=Math.min(appProcessed,onPrem),cloudUsed=Math.max(0,appProcessed-onPremUsed)
-  const gross=((cacheHits+standard)*STANDARD_PRICE+ai*AI_PRICE)*60
-  let expenses=.8+(owned(s,'server2')?1.5:0)+(owned(s,'backup')?.3:0)+(owned(s,'security')?.4:0)+(owned(s,'cache')?.4:0)
-  const billFactor=s.incident?.kind==='billing'?3:1
-  expenses+=(h.cloudInstances*.65+h.gpuCount*1.2+cloudUsed*60*.0001)*billFactor
-  const utilizations={network:clamp(networkLoad/Math.max(.001,network),0,1),compute:clamp(appDemand/Math.max(.001,compute),0,1),memory:clamp(memoryLoad/Math.max(.001,memory),0,1),storage:clamp(ioLoad/Math.max(.001,storage),0,1),ai:aiCapacity?clamp(aiDemand/aiCapacity,0,1):0}
-  const dominant=STAGES.reduce((best,k)=>losses[k]>losses[best]?k:best,STAGES[0])
-  const bottleneck=successRate>=.985?'healthy':dominant
-  const latency=w.residenceSeconds*1000+250*Math.max(...Object.values(utilizations))**3
-  const writeRateGiB=h.storageUsedGiB>=h.storageGiB?0:(standardWrites+aiWrites)*w.writeKiB/(1024*1024)
-  return {hardware:h,routes:{arrived:demand,cache:cacheHits,origin:standard,ai,rejected:dropped,pending:0},writeRateGiB,cloudUsed,missedRevenue,demand,standardDemand,aiDemand,aiServed:ai,losses,served,dropped,successRate,network,compute,memory,storage,onPrem,cloud,aiCapacity,cacheHits,latency,gross,expenses,net:gross-expenses,bottleneck,utilizations}
+export const calculateMetrics=(state:GameState):Metrics=>{
+ const effective=getEffectiveUpgrades(state),s=training(state)&&state.tutorial.replay?{...state,upgrades:effective,equipmentLevels:{cpu:effective.includes('cpu')?1:0,memory:effective.includes('memory')?1:0,ssd:effective.includes('ssd')?1:0,network:0,cloud:0,ai:0},fleet:{servers:1,storageGroups:1,networkLinks:1},storageUsedGiB:32,incident:null}:state
+ const h=getHardware(s),w=WORKLOAD,mix=training(s)?{cpuHeavy:0,dataHeavy:0,ai:0}:workloadMix(s)
+ if(training(s))h.networkMbps=1000
+ const demand=demandFor(s),aiShare=owned(s,'ai')?(s.challenge.active?Math.max(.35,mix.ai):mix.ai):0,aiDemand=demand*aiShare,standardDemand=demand-aiDemand
+ const stdCPU=1+mix.cpuHeavy+mix.dataHeavy*.1,stdMemory=1+(mix.cpuHeavy+mix.dataHeavy)*.25,stdOps=w.operations*(1+mix.dataHeavy*3),stdIo=w.ioMiB*(1+mix.dataHeavy*3),stdNet=1+mix.dataHeavy
+ const standardPrice=STANDARD_PRICE*(1+mix.cpuHeavy+mix.dataHeavy*.6),aiPrice=AI_PRICE
+ let network=h.networkMbps*1e6/(w.networkKiB*1024*8)
+ if(s.incident?.kind==='bot')network*=1-.35*(1-(owned(s,'security')?(s.policies.firewall==='strict'?.9:.7):0))
+ let standard=standardDemand,ai=aiDemand,standardWrites=standard*w.writeFraction,aiWrites=ai*w.writeFraction
+ const losses={network:0,compute:0,memory:0,storage:0,ai:0},missedRevenue={network:0,compute:0,memory:0,storage:0,ai:0}
+ const restrict=(stage:keyof typeof losses,ratio:number)=>{const r=clamp(ratio,0,1),a=standard*(1-r),b=ai*(1-r);losses[stage]+=a+b;missedRevenue[stage]+=(a*standardPrice+b*aiPrice)*60;standard*=r;ai*=r;standardWrites*=r;aiWrites*=r}
+ const networkLoad=standard*stdNet+ai*2
+ restrict('network',network/Math.max(.000001,networkLoad))
+ const admittedStandard=standard,admittedAI=ai
+ const cacheHits=owned(s,'cache')?standard*(1-w.writeFraction)*.35*(1-mix.cpuHeavy*.75-mix.dataHeavy*.5):0
+ standard-=cacheHits
+ if(h.storageUsedGiB>=h.storageGiB-.000000001){losses.storage+=standardWrites+aiWrites;missedRevenue.storage+=(standardWrites*standardPrice+aiWrites*aiPrice)*60;standard-=standardWrites;ai-=aiWrites;standardWrites=0;aiWrites=0}
+ const ioRatio=Math.min(1,h.storageIOPS/Math.max(.000001,standard*stdOps+ai*w.aiOperations),h.storageMiBs/Math.max(.000001,standard*stdIo+ai*w.aiIoMiB))
+ const eligibleCloudWork=(standard*stdCPU+ai*2)*ioRatio
+ const overhead=owned(s,'virtualization')?.95:1,strict=owned(s,'security')&&s.policies.firewall==='strict'?.92:1
+ const cpuPerServer=h.cpuCores*h.cpuGHz*1e9/w.instructions*overhead*strict,memoryPerServer=Math.floor(Math.max(0,h.ramGiB-h.reservedRamGiB-(owned(s,'virtualization')?.25:0))*1024/w.memoryMiB)/w.residenceSeconds
+ let availableServers=owned(s,'load_balancer')?h.serverCount:1
+ if(s.incident?.kind==='hardware')availableServers=Math.max(0,availableServers-Math.max(1,Math.ceil(availableServers*.25)))
+ else if(owned(s,'load_balancer')&&s.policies.loadBalancer==='redundancy')availableServers=Math.max(1,availableServers-1)
+ const activeServers=s.budgetGuard.enabled?Math.min(availableServers,Math.max(1,Math.ceil(Math.max(eligibleCloudWork,(standard*stdMemory+ai*2)*ioRatio)/Math.max(.001,Math.min(cpuPerServer,memoryPerServer))))):availableServers
+ const localCompute=activeServers*cpuPerServer,localMemory=activeServers*memoryPerServer
+ const cloud=h.cloudInstances*h.cloudInstanceCores*2.8e9/w.instructions*.95,compute=localCompute+cloud,memory=localMemory+h.cloudInstances*Math.floor((h.cloudInstanceRamGiB-1)*1024/w.memoryMiB)/w.residenceSeconds
+ const storage=Math.min(h.storageIOPS/w.operations,h.storageMiBs/w.ioMiB),aiCapacity=h.gpuCount*(h.gpuVRAMGiB>=w.modelVRAMGiB?1/w.gpuSeconds:0)
+ const cpuLoad=standard*stdCPU+ai*2;restrict('compute',compute/Math.max(.000001,cpuLoad))
+ const memoryLoad=standard*stdMemory+ai*2;restrict('memory',memory/Math.max(.000001,memoryLoad))
+ const appProcessed=standard*stdCPU+ai*2,ioLoad=standard*stdOps/w.operations+ai*w.aiOperations/w.operations
+ restrict('storage',Math.min(h.storageIOPS/Math.max(.000001,standard*stdOps+ai*w.aiOperations),h.storageMiBs/Math.max(.000001,standard*stdIo+ai*w.aiIoMiB)))
+ const gpuLost=Math.max(0,ai-aiCapacity),aiRatio=ai>0?(ai-gpuLost)/ai:0;losses.ai+=gpuLost;missedRevenue.ai+=gpuLost*aiPrice*60;ai-=gpuLost;aiWrites*=aiRatio
+ const served=cacheHits+standard+ai,dropped=Math.max(0,demand-served),successRate=served/Math.max(.001,demand),onPrem=Math.min(localCompute,localMemory),cloudUsed=Math.max(0,appProcessed-Math.min(appProcessed,onPrem))
+ const gross=((cacheHits+standard)*standardPrice+ai*aiPrice)*60,billFactor=s.incident?.kind==='billing'?1.5:1
+ const expenses=.8+Math.max(0,activeServers-1)*1.5+(owned(s,'backup')?.3:0)+(owned(s,'security')?.4:0)+(owned(s,'cache')?.4:0)+(h.cloudInstances*.65+h.gpuCount*1.2+cloudUsed*60*.0001)*billFactor
+ const utilizations={network:clamp(networkLoad/Math.max(.001,network),0,1),compute:clamp(cpuLoad/Math.max(.001,compute),0,1),memory:clamp(memoryLoad/Math.max(.001,memory),0,1),storage:clamp(ioLoad/Math.max(.001,storage),0,1),ai:aiCapacity?clamp(admittedAI/aiCapacity,0,1):0}
+ const dominant=STAGES.reduce((best,k)=>losses[k]>losses[best]?k:best,STAGES[0]),bottleneck=successRate>=.98?'healthy':dominant
+ const writeRateGiB=h.storageUsedGiB>=h.storageGiB?0:(standardWrites+aiWrites)*w.writeKiB/(1024*1024)
+ return {hardware:h,routes:{arrived:demand,cache:cacheHits,origin:standard,ai,rejected:dropped,pending:0},writeRateGiB,cloudUsed,missedRevenue,demand,standardDemand,aiDemand,aiServed:ai,losses,served,dropped,successRate,network,compute,memory,storage,onPrem,cloud,aiCapacity,cacheHits,latency:w.residenceSeconds*1000+250*Math.max(...Object.values(utilizations))**3,gross,expenses,net:gross-expenses,utilizations,bottleneck,admittedStandard,admittedAI,eligibleCloudWork,workloadMix:mix,activeServers,standbyServers:Math.max(0,h.serverCount-activeServers),standardPrice,aiPrice}
 }
 
-export type TutorialAction = 'inspect-server' | 'select-cpu' | 'open-hint'
-const lessonDefinitions = [
-  {title:'Your first lab',body:'Inspect, upgrade, and watch your service improve.',target:'server'},
-  {title:'Open your server',body:'Click the server to look inside.',target:'server',expectedAction:'inspect-server' as TutorialAction},
-  {title:'Find the CPU',body:'Click the CPU. It processes customer requests.',target:'cpu',expectedAction:'select-cpu' as TutorialAction},
-  {title:'Give the CPU a boost',body:'The CPU cannot keep up. Buy the highlighted upgrade.',target:'cpu',requiredUpgrade:'cpu' as UpgradeId},
-  {title:'Add working memory',body:'Memory keeps active work ready. Upgrade it next.',target:'memory',requiredUpgrade:'memory' as UpgradeId},
-  {title:'Upgrade Storage (SSD)',body:'Storage supplies customer data. A faster drive removes this limit.',target:'ssd',requiredUpgrade:'ssd' as UpgradeId},
-  {title:'Ask for a hint',body:'Click Hint to check how your service is doing.',target:'hint',expectedAction:'open-hint' as TutorialAction},
-  {title:'Your lab is ready',body:'Keep an eye on profit and use Hint when a component needs attention.',target:'server'},
+export type TutorialAction='inspect-server'|'select-cpu'|'open-dashboard'|'inspect-bottleneck'|'open-trophy'|'claim-rewards'|'open-hint'
+const lessonDefinitions=[
+ {title:'Your first lab',body:'Inspect, upgrade, and watch your service improve.',target:'server'},
+ {title:'Open your server',body:'Click the server to look inside.',target:'server',expectedAction:'inspect-server' as TutorialAction},
+ {title:'Find the CPU',body:'Click the CPU. It processes customer requests.',target:'cpu',expectedAction:'select-cpu' as TutorialAction},
+ {title:'Give the CPU a boost',body:'The CPU cannot keep up. Buy the highlighted upgrade.',target:'cpu',requiredUpgrade:'cpu' as UpgradeId},
+ {title:'Check the live monitor',body:'Open Performance & Operations to see what needs attention.',target:'dashboard',expectedAction:'open-dashboard' as TutorialAction},
+ {title:'Find the next bottleneck',body:'Memory cannot keep up. Choose Inspect upgrade on the Performance dashboard.',target:'dashboard',expectedAction:'inspect-bottleneck' as TutorialAction},
+ {title:'Add working memory',body:'Memory keeps active work ready. Upgrade it next.',target:'memory',requiredUpgrade:'memory' as UpgradeId},
+ {title:'Upgrade Storage (SSD)',body:'Storage supplies customer data. A faster drive removes this limit.',target:'ssd',requiredUpgrade:'ssd' as UpgradeId},
+ {title:'A reward is ready',body:'Click the trophy to see the checkpoints you completed.',target:'trophy',expectedAction:'open-trophy' as TutorialAction},
+ {title:'Claim your reward',body:'Claim rewards. These bonuses are separate from customer profit.',target:'trophy',expectedAction:'claim-rewards' as TutorialAction},
+ {title:'Your lab is ready',body:'Watch performance, upgrade the bottleneck, and serve reliable work to advance levels.',target:'dashboard'},
 ]
-
-export const getTutorialLesson = (s:GameState) => {
-  const lesson=lessonDefinitions[s.tutorial.step]??lessonDefinitions[0]
-  return {...lesson,actionLabel:s.tutorial.step===7?'Run my lab':'Continue tutorial',nextLabel:s.tutorial.step===7?'Run my lab':'Continue tutorial',progress:s.tutorial.step+1}
+export const getTutorialLesson=(s:GameState)=>({...lessonDefinitions[s.tutorial.step]??lessonDefinitions[0],actionLabel:s.tutorial.step===10?'Run my lab':'Continue tutorial',nextLabel:s.tutorial.step===10?'Run my lab':'Continue tutorial',progress:s.tutorial.step+1})
+const syncTutorial=(s:GameState)=>{s.tutorialStep=s.tutorial.step;s.tutorialComplete=s.tutorial.status==='complete'||s.tutorial.status==='skipped'}
+const moveTutorial=(s:GameState,step:number)=>{s.tutorial.step=Math.min(10,step);s.tutorial.phase=[1,2,4,5,8,9].includes(step)?'action':'explain';s.tutorial.demoRemaining=0;s.tutorial.demonstrated=false;s.paused=s.tutorial.phase==='explain';syncTutorial(s)}
+export const startTutorial=(state:GameState)=>{const s=structuredClone(state);s.tutorial={status:'active',step:1,phase:'action',demoRemaining:0,replay:false,demonstrated:false};s.paused=false;syncTutorial(s);s.metrics=calculateMetrics(s);return s}
+export const replayTutorial=(state:GameState)=>{const s=startTutorial(state);s.tutorial.replay=true;s.tutorial.returnPaused=state.paused;s.metrics=calculateMetrics(s);return s}
+export const skipTutorial=(state:GameState)=>{const s=structuredClone(state),replay=s.tutorial.replay;s.tutorial.status='skipped';s.tutorial.phase='explain';s.tutorial.demoRemaining=0;s.paused=replay?(s.tutorial.returnPaused??false):false;syncTutorial(s);s.metrics=calculateMetrics(s);addLog(s,'Open Lab online. Watch performance and upgrade the bottleneck.','good');if(!replay)awardAchievements(s);return s}
+export const tutorialAction=(state:GameState,action:TutorialAction)=>{const t=state.tutorial;if(t.status!=='active'||t.phase!=='action'||getTutorialLesson(state).expectedAction!==action)return state;if(action==='claim-rewards'&&!t.replay&&getClaimableRewards(state).count>0)return state;const s=structuredClone(state);moveTutorial(s,t.step+1);s.metrics=calculateMetrics(s);return s}
+export const advanceTutorial=(state:GameState)=>{
+ if(state.tutorial.status!=='active'||state.tutorial.phase!=='explain')return state
+ const s=structuredClone(state),t=s.tutorial
+ if(t.step===10){t.status='complete';s.paused=t.replay?(t.returnPaused??false):false;addLog(s,'Orientation complete. Build your fleet.','good');if(!t.replay)awardAchievements(s)}
+ else{const upgrade=lessonDefinitions[t.step].requiredUpgrade;if(!upgrade)return state;if(!t.replay&&owned(s,upgrade))moveTutorial(s,t.step+1);else{t.phase='action';s.paused=false;const grant=t.replay?0:Math.max(0,getEquipmentQuote(s,upgrade as EquipmentId).cost-s.cash);if(grant){s.cash+=grant;s.revenue.grants+=grant;addLog(s,`Training grant: +$${Math.ceil(grant)} for ${upgradeById[upgrade].name}.`,'good')}}}
+ syncTutorial(s);s.metrics=calculateMetrics(s);return s
 }
-const syncTutorial = (s:GameState) => {s.tutorialStep=s.tutorial.step;s.tutorialComplete=s.tutorial.status==='complete'||s.tutorial.status==='skipped'}
-const moveTutorial = (s:GameState,step:number) => {
-  s.tutorial.step=Math.min(7,step);s.tutorial.phase=[1,2,6].includes(step)?'action':'explain';s.tutorial.demoRemaining=0;s.tutorial.demonstrated=false
-  s.paused=s.tutorial.phase==='explain';syncTutorial(s)
-}
-export const startTutorial = (state:GameState) => {
-  const s=structuredClone(state)
-  s.tutorial={status:'active',step:1,phase:'action',demoRemaining:0,replay:false,demonstrated:false}
-  s.paused=false;syncTutorial(s);s.metrics=calculateMetrics(s);return s
-}
-export const replayTutorial = (state:GameState) => {
-  const s=startTutorial(state);s.tutorial.replay=true;s.tutorial.returnPaused=state.paused;s.metrics=calculateMetrics(s);return s
-}
-export const skipTutorial = (state:GameState) => {
-  const s=structuredClone(state),wasReplay=s.tutorial.replay
-  s.tutorial.status='skipped';s.tutorial.phase='explain';s.tutorial.demoRemaining=0
-  s.paused=wasReplay?(s.tutorial.returnPaused??false):false;syncTutorial(s);s.metrics=calculateMetrics(s)
-  addLog(s,'Open Lab online. Use Hint for a quick service check.','good')
-  if(!wasReplay)awardAchievements(s)
-  return s
-}
-export const tutorialAction = (state:GameState,action:TutorialAction) => {
-  const t=state.tutorial
-  if(t.status!=='active'||t.phase!=='action'||getTutorialLesson(state).expectedAction!==action)return state
-  const s=structuredClone(state);moveTutorial(s,t.step+1);s.metrics=calculateMetrics(s);return s
-}
-export const advanceTutorial = (state:GameState) => {
-  if(state.tutorial.status!=='active'||state.tutorial.phase!=='explain')return state
-  const s=structuredClone(state),t=s.tutorial
-  if(t.step===7){
-    t.status='complete';s.paused=t.replay?(t.returnPaused??false):false;s.nextIncidentAt=s.elapsed+150
-    addLog(s,'Orientation complete. Build the infrastructure your way.','good');if(!t.replay)awardAchievements(s)
-  }else{
-    const upgrade=lessonDefinitions[t.step].requiredUpgrade
-    if(!upgrade)return state
-    if(!t.replay&&owned(s,upgrade))moveTutorial(s,t.step+1)
-    else{
-      t.phase='action';t.demoRemaining=0;s.paused=false
-      const grant=t.replay?0:Math.max(0,getEquipmentQuote({...s,tutorial:{...t,phase:'action'}},upgrade as EquipmentId).cost-s.cash)
-      if(grant){s.cash+=grant;s.revenue.grants+=grant;addLog(s,`Training grant: +$${Math.ceil(grant)} for ${upgradeById[upgrade].name}.`,'good')}
-    }
-  }
-  syncTutorial(s);s.metrics=calculateMetrics(s);return s
-}
-export const inspectDiagnostics = (s:GameState) => advanceTutorial(s)
+export const inspectDiagnostics=(s:GameState)=>advanceTutorial(s)
 
 export const canPurchase = (s: GameState, id: UpgradeId) => {
   if (id === 'cpu' || id === 'memory' || id === 'ssd') {
@@ -295,12 +293,12 @@ export const canPurchase = (s: GameState, id: UpgradeId) => {
 }
 
 const makeIncident = (kind: IncidentKind, s: GameState): Incident => {
-  const duration = kind === 'hardware' ? owned(s, 'backup') ? 10 : 25 : kind === 'bot' ? owned(s, 'security') ? s.policies.firewall === 'strict' ? 5 : 9 : 25 : kind === 'marketing' ? 25 : 22
+  const duration=kind==='hardware'?(owned(s,'backup')?60:90):kind==='bot'&&owned(s,'security')?60:75
   const details = {
     marketing: ['Marketing traffic spike', 'A promotion is sending more visitors than forecast. More capacity and caching can help.'],
     hardware: ['Server hardware fault', 'One machine is degraded. Backup recovery shortens the outage; redundancy reduces the capacity loss.'],
     bot: ['Automated bot attack', 'Suspicious traffic is consuming gateway capacity. Firewall protection reduces the impact and duration.'],
-    billing: ['Cloud bill shock', 'Cloud capacity and usage temporarily cost three times as much. Economy autoscaling carries less spare capacity.'],
+    billing: ['Cloud bill shock', 'Cloud capacity and usage temporarily cost 50% more. Economy autoscaling carries less spare capacity.'],
   }
   return { kind, title: details[kind][0], detail: details[kind][1], remaining: duration, total: duration, stats:emptyEventStats() }
 }
@@ -308,7 +306,7 @@ const makeIncident = (kind: IncidentKind, s: GameState): Incident => {
 const announceIncident = (s:GameState) => {
   if(!s.incident)return
   const story=EVENT_STORIES[s.incident.kind]
-  announce(s,'incident',story.title,`${story.body} Duration: ${Math.ceil(s.incident.remaining)} minutes.`,{illustration:s.incident.kind,tip:story.tip})
+  announce(s,'incident',story.title,`${story.body} Event time: ${Math.ceil(s.incident.remaining)} seconds.`,{illustration:s.incident.kind,tip:story.tip})
 }
 
 const queueIncident = (s: GameState, kind: IncidentKind) => {
@@ -316,7 +314,7 @@ const queueIncident = (s: GameState, kind: IncidentKind) => {
 }
 export const triggerIncident = (state: GameState, kind: IncidentKind) => {
   const s = structuredClone(state)
-  if (s.incident || training(s) || s.elapsed < s.nextIncidentAt) queueIncident(s, kind)
+  if (s.incident || training(s)) return state
   else { s.incident = makeIncident(kind, s); if (!s.triggered.includes(kind)) s.triggered.push(kind); addLog(s, s.incident.title, 'warn'); announceIncident(s) }
   return s
 }
@@ -326,13 +324,12 @@ export const purchaseUpgrade = (state: GameState, id: UpgradeId) => {
   if (!canPurchase(state, id).ok) return state
   const s = structuredClone(state), item = upgradeById[id]
   s.cash -= item.cost; s.revenue.purchases += item.cost; s.upgrades.push(id); s.upgradeTimes[id] = s.elapsed
+  if(id==='server2')s.fleet.servers=Math.max(2,s.fleet.servers)
+  if(id==='ai')s.aiLaunchLevel=s.companyLevel
   if ((id === 'cloud' || id === 'ai') && s.rentalsEnabled) s.provisioning={target:owned(s,'cloud')?Math.max(1,s.cloudProvisioned,s.provisioning.target):0,gpuTarget:owned(s,'ai')?Math.max(1,s.aiProvisioned,s.provisioning.gpuTarget):0,remaining:2}
   addLog(s, `${item.name} installed. ${item.effect}`, 'good')
   if (training(s)) { s.tutorial.phase = 'demo'; s.tutorial.demoRemaining = 4; s.paused = false }
-  else {
-    const milestone: Partial<Record<UpgradeId, IncidentKind>> = { ssd: 'marketing', server2: 'hardware', load_balancer: 'bot', cloud: 'billing' }
-    if (milestone[id]) queueIncident(s, milestone[id]!)
-  }
+
   s.metrics = calculateMetrics(s)
   s.lastPurchase = {id,at:s.elapsed,before:calculateMetrics(state),after:s.metrics,beforeLevel:0,afterLevel:1,quantity:1,cost:item.cost}
   announce(s,'technology',`Acquired: ${item.name}`,item.short,{illustration:id,impact:s.lastPurchase,tip:TECHNOLOGY_TIPS[id]})
@@ -350,11 +347,10 @@ export const getRecommendation = (s: GameState): AdvisorRecommendation => {
   const m = calculateMetrics(s)
   const capacityGoal: Record<string, EquipmentId> = {network:'network',compute:'cpu',memory:'memory',storage:'ssd',ai:'ai'}
   if (m.bottleneck !== 'healthy') {
-    const goal = capacityGoal[m.bottleneck], upgradeId = goal === 'ai' && !owned(s,'ai') ? dependencyFor(s,'ai') : s.equipmentLevels[goal]>=MAX_LEVELS[goal]?dependencyFor(s,goal==='cpu'||goal==='memory'?'cloud':'autoscaling'):goal
+    const goal=capacityGoal[m.bottleneck],capped=s.equipmentLevels[goal]>=MAX_LEVELS[goal],upgradeId=goal==='ai'&&!owned(s,'ai')?dependencyFor(s,'ai'):capped&&(goal==='cpu'||goal==='memory')&&!owned(s,'load_balancer')?dependencyFor(s,'load_balancer'):goal
     const name = m.bottleneck === 'compute' ? 'CPU processing' : m.bottleneck === 'ai' ? 'AI inference' : m.bottleneck
-    const limits = { network: m.network, compute: m.compute, memory: m.memory, storage: m.storage, ai: m.aiCapacity }
-    const incoming = m.bottleneck === 'ai' ? m.aiDemand : m.bottleneck === 'network' ? m.demand : m.standardDemand - m.cacheHits
-    const reason = `Your ${name} is limiting requests: its capacity is ${limits[m.bottleneck].toFixed(1)} requests/second, while ${incoming.toFixed(1)} requests need that stage.${upgradeId ? upgradeId === goal ? ` Add ${equipmentById[goal].name} levels to address this limit.` : ` Work toward ${equipmentById[goal].name}; first install ${upgradeById[upgradeId].name}, its next prerequisite.` : ' Allow the elastic service time to scale; Resilient policy responds faster and keeps more headroom.'}`
+    const expansion=goal==='cpu'||goal==='memory'?'servers':goal==='ssd'?'storage groups':goal==='network'?'network links':'GPU workers'
+    const reason=upgradeId!==goal?`Your ${name} cannot keep up. Install ${upgradeById[upgradeId!].name} to enable more capacity.`:capped?`Your ${name} cannot keep up. Add more ${expansion} from this component's expansion controls.`:`Your ${name} cannot keep up. Consider a ${equipmentById[goal].name} upgrade.`
     return { id: `capacity-${m.bottleneck}-${upgradeId ?? 'scale'}`, title: `Current priority: ${name}`, reason, upgradeId, target: upgradeId ?? (m.bottleneck === 'network' ? 'gateway' : 'diagnostics'), priority: 'capacity' }
   }
   const risk = s.incident?.kind === 'hardware' ? 'backup' : s.incident?.kind === 'bot' ? 'security' : !owned(s, 'backup') && owned(s, 'ssd') ? 'backup' : !owned(s, 'security') && owned(s, 'virtualization') ? 'security' : undefined
@@ -390,7 +386,6 @@ export const setPolicy = (state: GameState, group: keyof PolicyState, value: str
 export const getChallengeReadiness = (state: GameState) => {
   const s = structuredClone(state), reasons: string[] = []
   if (!owned(s, 'ai')) reasons.push('Install AI Inference to unlock Launch Day.')
-  if (s.reputation < 65) reasons.push('Recover reputation to at least 65 by serving current demand reliably.')
   if (s.incident) reasons.push('Wait until the active incident has resolved.')
   s.challenge.active = true
   const m = calculateMetrics(s)
@@ -407,94 +402,76 @@ export const startChallenge = (state: GameState) => {
 export const setSpeed = (s: GameState, speed: 1 | 2 | 4) => [1, 2, 4].includes(speed) ? { ...s, speed } : s
 export const togglePause = (s: GameState) => training(s) ? s : { ...s, paused: !s.paused }
 
-const tick = (s: GameState, dt: number) => {
-  s.elapsed += dt
-  s.metrics = calculateMetrics(s)
-  const incidentExtraDemand=s.incident?.kind==='marketing'?s.metrics.demand-demandFor({...s,incident:null}):0
-  if (!(training(s) && s.tutorial.replay)) {
-    s.cash += s.metrics.net * dt
-    s.revenue.gross+=s.metrics.gross*dt;s.revenue.expenses+=s.metrics.expenses*dt
-    s.totalServed += s.metrics.served * dt * 60
-    s.storageUsedGiB=Math.min(s.metrics.hardware.storageGiB,s.storageUsedGiB+s.metrics.writeRateGiB*dt*60)
-    if (!training(s)) s.aiServed += s.metrics.aiServed * dt * 60
-  }
-  if (training(s)) {
-    if(s.tutorial.phase==='demo'){s.tutorial.demoRemaining=Math.max(0,s.tutorial.demoRemaining-dt);if(s.tutorial.demoRemaining<=.000001)moveTutorial(s,s.tutorial.step+1)}
-    return
-  }
-  const repDelta = s.metrics.successRate >= .98 ? .05 : -.06 * (1 - s.metrics.successRate)
-  s.stableServiceMinutes = s.metrics.successRate >= .98 ? s.stableServiceMinutes + dt : 0
-  s.reputation = clamp(s.reputation + repDelta * dt, 0, 100)
-  if(s.rentalsEnabled){
-    if(s.provisioning.remaining>0){s.provisioning.remaining=Math.max(0,s.provisioning.remaining-dt);if(s.provisioning.remaining<=.000001){s.cloudProvisioned=s.provisioning.target;s.aiProvisioned=s.provisioning.gpuTarget;s.provisioning={target:s.cloudProvisioned,gpuTarget:s.aiProvisioned,remaining:0}}}
-    if(owned(s,'autoscaling')){
-      s.scaleTimer+=dt
-      const delay=s.policies.autoscaling==='economy'?10:3
-      if(s.scaleTimer>=delay&&s.provisioning.remaining===0){
-        s.scaleTimer%=delay
-        const targetUse=s.policies.autoscaling==='economy'?.85:.60
-        const work=(s.metrics.standardDemand-s.metrics.cacheHits)+s.metrics.aiDemand*2
-        const target=clamp(Math.ceil(Math.max(0,work/targetUse-s.metrics.onPrem)/(4*2.8e9/WORKLOAD.instructions*.95)),Math.min(8,1+s.equipmentLevels.cloud),8)
-        const gpuTarget=owned(s,'ai')?clamp(Math.ceil(s.metrics.aiDemand/(20*targetUse)),Math.min(4,1+s.equipmentLevels.ai),4):0
-        if(target!==s.cloudProvisioned||gpuTarget!==s.aiProvisioned)s.provisioning={target,gpuTarget,remaining:2}
-      }
-    }
-  }
-  if (s.incident) {
-    const stats=s.incident.stats??=emptyEventStats(true)
-    integrateEvent(stats,s.metrics,dt,incidentExtraDemand)
-    s.incident.remaining -= dt
-    if (s.incident.remaining <= .000001) {
-      const kind=s.incident.kind
-      const dominant=STAGES.reduce((best,stage)=>stats.missedByStage[stage]>stats.missedByStage[best]?stage:best,STAGES[0])
-      const report={...stats,missedByStage:{...stats.missedByStage},id:`report-${s.announcementSequence+1}`,kind,title:kind==='marketing'?'Marketing campaign feedback':kind==='hardware'?'Recovery debrief':kind==='bot'?'Security incident debrief':'Cloud spending debrief',endedAt:s.elapsed,dominantStage:stats.dropped>.000001?dominant:null}
-      s.eventReports=[report,...s.eventReports].slice(0,20)
-      announce(s,'report',report.title,'Here is how your infrastructure handled the event.',{illustration:kind,reportId:report.id})
-      addLog(s, `${s.incident.title} resolved.`, 'good'); s.incident = null; s.nextIncidentAt = s.elapsed + 90; s.incidentsRecovered++
-    }
-  }
-  if (!s.incident && !s.challenge.active && s.elapsed >= s.nextIncidentAt) {
-    let kind = s.incidentQueue.shift()
-    if (!kind && s.upgrades.length >= 4) {
-      const available: IncidentKind[] = ['marketing']
-      if (owned(s, 'server2')) available.push('hardware')
-      if (owned(s, 'load_balancer')) available.push('bot')
-      if (owned(s, 'cloud')) available.push('billing')
-      kind = available[Math.floor(nextRandom(s) * available.length)]
-    }
-    if (kind) {
-      s.incident = makeIncident(kind, s)
-      if (!s.triggered.includes(kind)) s.triggered.push(kind)
-      addLog(s, s.incident.title, 'warn')
-      announceIncident(s)
-    }
-  }
-  if (s.challenge.active) {
-    s.challenge.remaining = Math.max(0, s.challenge.remaining - dt)
-    s.challenge.totalDemand += s.metrics.demand * dt * 60; s.challenge.totalServed += s.metrics.served * dt * 60
-    if (s.challenge.remaining <= .000001) {
-      const passed = s.challenge.totalServed / Math.max(1, s.challenge.totalDemand) >= .90 && s.reputation >= 65
-      s.challenge.active = false; s.challenge.result = passed ? 'passed' : 'failed'
-      if (passed) { s.completed = true; addLog(s, 'Launch Day passed! Endless Lab mode unlocked.', 'good'); announce(s,'challenge','Launch Day passed','You served the launch traffic reliably. Endless Lab is now open.') }
-      else { s.challenge.retryAt = s.elapsed + 30; addLog(s, 'Launch Day missed its target. Review service capacity and reputation, then retry.', 'warn'); announce(s,'challenge','Launch Day needs another try','Review the served percentage, capacity meters, and reputation. You can retry after 30 minutes.') }
-    }
-  }
-  awardAchievements(s)
+const checkpointEvent=(s:GameState)=>{
+ if(s.companyLevel%5!==0||s.companyLevel<=s.eventCheckpoint)return
+ s.eventCheckpoint=s.companyLevel
+ if(s.incident||s.challenge.active||s.eventQuietSeconds>0)return
+ const available:IncidentKind[]=['marketing']
+ if(s.companyLevel>5){if(s.fleet.servers>=2)available.push('hardware');if(owned(s,'load_balancer'))available.push('bot');if(owned(s,'cloud')&&(s.cloudProvisioned+s.aiProvisioned)>0)available.push('billing')}
+ const kind=s.companyLevel===5?'marketing':available[Math.floor(nextRandom(s)*available.length)]
+ s.incident=makeIncident(kind,s);if(!s.triggered.includes(kind))s.triggered.push(kind);addLog(s,s.incident.title,'warn');announceIncident(s)
 }
-
-export const stepGame = (state: GameState, realDelta: number): GameState => {
-  if (state.paused || getNextAnnouncement(state) || !Number.isFinite(realDelta) || realDelta <= 0) return state
-  const s = structuredClone(state)
-  let remaining = realDelta * s.speed
-  while (remaining > .000001 && !s.paused && !getNextAnnouncement(s)) { const dt = Math.min(.1, remaining, s.incident&& !training(s)?Math.max(.000001,s.incident.remaining):Infinity,s.challenge.active?Math.max(.000001,s.challenge.remaining):Infinity); tick(s, dt); remaining -= dt }
-  s.metrics = calculateMetrics(s)
-  return s
+const tick=(s:GameState,dt:number,realDt:number,current:Metrics)=>{
+ s.elapsed+=dt;s.activeSeconds+=realDt;s.metrics=current
+ const incidentExtra=s.incident?.kind==='marketing'?s.metrics.demand-demandFor({...s,incident:null}):0
+ if(!(training(s)&&s.tutorial.replay)){
+  s.cash+=s.metrics.net*dt;s.revenue.gross+=s.metrics.gross*dt;s.revenue.expenses+=s.metrics.expenses*dt;s.totalServed+=s.metrics.served*dt*60
+  s.storageUsedGiB=Math.min(s.metrics.hardware.storageGiB,s.storageUsedGiB+s.metrics.writeRateGiB*dt*60)
+  if(!training(s))s.aiServed+=s.metrics.aiServed*dt*60
+ }
+ if(training(s)){if(!s.tutorial.replay)awardAchievements(s);if(s.tutorial.phase==='demo'){s.tutorial.demoRemaining=Math.max(0,s.tutorial.demoRemaining-dt);if(s.tutorial.demoRemaining<=.000001)moveTutorial(s,s.tutorial.step+1)}return}
+ s.eventQuietSeconds=Math.max(0,s.eventQuietSeconds-realDt)
+ s.stableServiceMinutes=s.metrics.successRate>=.98?s.stableServiceMinutes+dt:0
+ // Falling behind stalls progress; it never increases demand or creates a reputation death spiral.
+ if(s.metrics.successRate>=.98){s.reputation=clamp(s.reputation+.05*dt,0,100);s.levelProgress+=s.metrics.served*dt*60}
+ const completedLevel=s.levelProgress>=s.levelQuota-.000001
+ if(s.rentalsEnabled){
+  if(s.provisioning.remaining>0){s.provisioning.remaining=Math.max(0,s.provisioning.remaining-dt);if(s.provisioning.remaining<=.000001){s.cloudProvisioned=s.provisioning.target;s.aiProvisioned=s.provisioning.gpuTarget;s.provisioning={target:s.cloudProvisioned,gpuTarget:s.aiProvisioned,remaining:0}}}
+  if(owned(s,'autoscaling')){
+   s.scaleTimer+=dt;const delay=s.policies.autoscaling==='economy'?10:3
+   if(s.scaleTimer>=delay&&s.provisioning.remaining===0){s.scaleTimer%=delay;const use=s.policies.autoscaling==='economy'?.85:.6
+    const neededVMs=Math.ceil(Math.max(0,s.metrics.eligibleCloudWork/use-s.metrics.onPrem)/(4*2.8e9/WORKLOAD.instructions*.95))
+    const target=Math.max(s.budgetGuard.enabled?0:1+s.equipmentLevels.cloud,neededVMs)
+    const gpuTarget=owned(s,'ai')?Math.max(s.budgetGuard.enabled?0:1+s.equipmentLevels.ai,Math.ceil(Math.min(s.metrics.admittedAI,s.metrics.storage)/Math.max(.01,20*use))):0
+    if(target!==s.cloudProvisioned||gpuTarget!==s.aiProvisioned)s.provisioning={target,gpuTarget,remaining:2}
+   }
+  }
+ }
+ if(s.budgetGuard.enabled&&s.metrics.net<-.005){
+  s.budgetGuard.lossSeconds+=realDt;s.budgetGuard.status='warning'
+  const timeToEmpty=s.cash/Math.max(.001,-s.metrics.net*s.speed)
+  if(s.budgetGuard.lossSeconds>=8||timeToEmpty<8){
+   const requiredVMs=Math.max(0,Math.ceil(Math.max(0,s.metrics.eligibleCloudWork-s.metrics.onPrem)/(4*2.8e9/WORKLOAD.instructions*.95))),requiredGPUs=owned(s,'ai')?Math.ceil(Math.min(s.metrics.admittedAI,s.metrics.storage)/20):0
+   s.cloudProvisioned=Math.min(s.cloudProvisioned,requiredVMs);s.aiProvisioned=Math.min(s.aiProvisioned,requiredGPUs)
+   s.provisioning={target:s.cloudProvisioned,gpuTarget:s.aiProvisioned,remaining:0};s.budgetGuard.status='recovering';s.scaleTimer=0
+  }
+ }else{s.budgetGuard.lossSeconds=0;s.budgetGuard.status='healthy'}
+ if(s.incident){
+  const stats=s.incident.stats??=emptyEventStats(true);integrateEvent(stats,s.metrics,dt,incidentExtra,realDt);s.incident.remaining=Math.max(0,s.incident.remaining-realDt)
+  if(s.incident.remaining<=.000001){const kind=s.incident.kind,dominant=STAGES.reduce((best,k)=>stats.missedByStage[k]>stats.missedByStage[best]?k:best,STAGES[0]);const report={...stats,missedByStage:{...stats.missedByStage},id:`report-${s.announcementSequence+1}`,kind,title:kind==='marketing'?'Marketing campaign feedback':kind==='hardware'?'Recovery debrief':kind==='bot'?'Security incident debrief':'Cloud spending debrief',endedAt:s.elapsed,dominantStage:stats.dropped>.000001?dominant:null};s.eventReports=[report,...s.eventReports].slice(0,20);announce(s,'report',report.title,'Here is how your infrastructure handled the event.',{illustration:kind,reportId:report.id});addLog(s,`${s.incident.title} resolved.`,'good');s.incident=null;s.eventQuietSeconds=45;s.incidentsRecovered++}
+ }
+ if(s.challenge.active){
+  s.challenge.remaining=Math.max(0,s.challenge.remaining-dt);s.challenge.totalDemand+=s.metrics.demand*dt*60;s.challenge.totalServed+=s.metrics.served*dt*60
+  if(s.challenge.remaining<=.000001){const passed=s.challenge.totalServed/Math.max(1,s.challenge.totalDemand)>=.9;s.challenge.active=false;s.challenge.result=passed?'passed':'failed';if(passed){s.completed=true;announce(s,'challenge','Launch Day passed','Your architecture kept up. Keep expanding your fleet.')}else{s.challenge.retryAt=s.elapsed+30;announce(s,'challenge','Launch Day needs another try','Inspect the limiting component and try again.')}}
+ }
+ if(completedLevel){s.levelProgress=0;s.companyLevel++;s.levelQuota=quotaForLevel(s.companyLevel);checkpointEvent(s)}
+ awardAchievements(s)
+}
+export const stepGame=(state:GameState,realDelta:number):GameState=>{
+ if(state.paused||getNextAnnouncement(state)||!Number.isFinite(realDelta)||realDelta<=0)return state
+ const s=structuredClone(state);let remaining=realDelta
+ while(remaining>.000001&&!s.paused&&!getNextAnnouncement(s)){
+  const current=calculateMetrics(s),quotaBoundary=!training(s)&&current.successRate>=.98?Math.max(.000001,(s.levelQuota-s.levelProgress)/(Math.max(.001,current.served)*60*s.speed)):Infinity
+  const realDt=Math.min(.1/s.speed,remaining,s.incident&&!training(s)?Math.max(.000001,s.incident.remaining):Infinity,s.challenge.active?Math.max(.000001,s.challenge.remaining/s.speed):Infinity,quotaBoundary)
+  tick(s,realDt*s.speed,realDt,current);remaining-=realDt
+ }
+ s.metrics=calculateMetrics(s);return s
 }
 
 export const setRentalsEnabled=(state:GameState,enabled:boolean):GameState=>{
   if(state.rentalsEnabled===enabled||training(state))return state
   const s=structuredClone(state);s.rentalsEnabled=enabled;s.cloudProvisioned=0;s.aiProvisioned=0
-  s.provisioning=enabled?{target:owned(s,'cloud')?Math.min(8,1+s.equipmentLevels.cloud):0,gpuTarget:owned(s,'ai')?Math.min(4,1+s.equipmentLevels.ai):0,remaining:2}:{target:0,gpuTarget:0,remaining:0}
+  s.provisioning=enabled?{target:owned(s,'cloud')?1+s.equipmentLevels.cloud:0,gpuTarget:owned(s,'ai')?1+s.equipmentLevels.ai:0,remaining:2}:{target:0,gpuTarget:0,remaining:0}
   addLog(s,enabled?'Rented pools restarting; ready in 2 minutes.':'Rented CPU and GPU pools stopped. Their ongoing charges are suspended.')
   s.metrics=calculateMetrics(s);return s
 }
@@ -508,7 +485,7 @@ export const loadGame = (value: string): GameState | null => {
     const validStats = (x:unknown): x is import('./types').EventStatistics => {
       if(!x||typeof x!=='object')return false
       const v=x as Record<string,unknown>,loss=v.missedByStage as Record<string,unknown>
-      return ['duration','standardRequests','aiRequests','served','dropped','gross','expenses','potentialGross','extraRequests'].every(k=>finite(v[k]))&&typeof v.partial==='boolean'&&!!loss&&STAGES.every(k=>finite(loss[k]))&&Number(v.gross)<=Number(v.potentialGross)+.001&&Math.abs(Number(v.served)+Number(v.dropped)-Number(v.standardRequests)-Number(v.aiRequests))<.01
+      return ['duration','standardRequests','aiRequests','served','dropped','gross','expenses','potentialGross','extraRequests'].every(k=>finite(v[k]))&&(v.durationSeconds===undefined||finite(v.durationSeconds))&&typeof v.partial==='boolean'&&!!loss&&STAGES.every(k=>finite(loss[k]))&&Number(v.gross)<=Number(v.potentialGross)+.001&&Math.abs(Number(v.served)+Number(v.dropped)-Number(v.standardRequests)-Number(v.aiRequests))<.01
     }
     const validMetrics = (x:unknown):x is Metrics => {
       if(!x||typeof x!=='object')return false
@@ -518,13 +495,13 @@ export const loadGame = (value: string): GameState | null => {
     const validImpact = (v:unknown):v is import('./types').PurchaseImpact => {
       if(!v||typeof v!=='object')return false
       const x=v as import('./types').PurchaseImpact
-      return [...ids,'network'].includes(x.id)&&finite(x.at)&&validMetrics(x.before)&&validMetrics(x.after)&&['beforeLevel','afterLevel','quantity','cost'].every(k=>(x as unknown as Record<string,unknown>)[k]===undefined||finite((x as unknown as Record<string,unknown>)[k]))
+      return [...ids,'network'].includes(x.id)&&(x.expansionPool===undefined||['servers','storage','network','cloud','ai'].includes(x.expansionPool))&&finite(x.at)&&validMetrics(x.before)&&validMetrics(x.after)&&['beforeLevel','afterLevel','quantity','cost'].every(k=>(x as unknown as Record<string,unknown>)[k]===undefined||finite((x as unknown as Record<string,unknown>)[k]))
     }
-    if (!p || ![1, 2, 3, 4, 5].includes(p.version) || !finite(p.cash,p.version===5?-1e15:0) || !Array.isArray(p.upgrades)) return null
+    if (!p || ![1, 2, 3, 4, 5, 6].includes(p.version) || !finite(p.cash,p.version>=5?-1e15:0) || !Array.isArray(p.upgrades)) return null
     if (new Set(p.upgrades).size !== p.upgrades.length || p.upgrades.some((id: UpgradeId) => !ids.includes(id) || (!(p.version >= 3 && (id === 'memory' || id === 'ssd')) && upgradeById[id].prerequisites.some((dep) => !p.upgrades.includes(dep))))) return null
     const s = createInitialState()
     const numberKeys = ['cash', 'elapsed', 'totalServed', 'policyCooldownUntil', 'nextIncidentAt'] as const
-    for (const key of numberKeys) if (p[key] !== undefined) { if (!finite(p[key],key==='cash'&&p.version===5?-1e15:0)) return null; s[key] = p[key] }
+    for (const key of numberKeys) if (p[key] !== undefined) { if (!finite(p[key],key==='cash'&&p.version>=5?-1e15:0)) return null; s[key] = p[key] }
     if (p.reputation !== undefined) { if (!finite(p.reputation, 0, 100)) return null; s.reputation = p.reputation }
     if (p.speed !== undefined) { if (![1, 2, 4].includes(p.speed)) return null; s.speed = p.speed }
     for (const key of ['paused', 'completed'] as const) if (p[key] !== undefined) { if (typeof p[key] !== 'boolean') return null; s[key] = p[key] }
@@ -534,8 +511,8 @@ export const loadGame = (value: string): GameState | null => {
       if (!p.equipmentLevels || typeof p.equipmentLevels !== 'object') return null
       for (const item of EQUIPMENT) {
         const n = p.equipmentLevels[item.id]
-        if (!Number.isSafeInteger(n) || n < 0 || (item.unlock && !owned(s,item.unlock) && n > 0)) return null
-        s.equipmentLevels[item.id] = n
+        if (!Number.isSafeInteger(n) || n < 0 || (p.version===6&&basicEquipment.includes(item.id as typeof basicEquipment[number])&&n>MAX_LEVELS[item.id]) || (item.unlock && !owned(s,item.unlock) && n > 0)) return null
+        s.equipmentLevels[item.id] = p.version<6&&basicEquipment.includes(item.id as typeof basicEquipment[number])?Math.min(n,MAX_LEVELS[item.id]):n
       }
       for (const id of ['cpu','memory','ssd'] as const) if (owned(s,id) !== (s.equipmentLevels[id] > 0)) return null
       for (const key of ['aiServed','stableServiceMinutes','incidentsRecovered'] as const) {
@@ -559,16 +536,16 @@ export const loadGame = (value: string): GameState | null => {
     }
     if (p.version >= 2) {
       const t = p.tutorial
-      if (!t || !['welcome', 'active', 'complete', 'skipped'].includes(t.status) || !Number.isInteger(t.step) || t.step < 0 || t.step > 7 || !['explain', 'demo', 'action'].includes(t.phase) || !finite(t.demoRemaining, 0, 4) || typeof t.replay !== 'boolean' || typeof t.demonstrated !== 'boolean') return null
-      if (t.phase === 'action' && ![1,2,3,4,5,6].includes(t.step)) return null
+      if (!t || !['welcome', 'active', 'complete', 'skipped'].includes(t.status) || !Number.isInteger(t.step) || t.step < 0 || t.step > (p.version===6?10:7) || !['explain', 'demo', 'action'].includes(t.phase) || !finite(t.demoRemaining, 0, 4) || typeof t.replay !== 'boolean' || typeof t.demonstrated !== 'boolean') return null
+      if (t.phase === 'action' && !(p.version===6?[1,2,3,4,5,6,7,8,9]:[1,2,3,4,5,6]).includes(t.step)) return null
       if (t.phase !== 'explain' && t.status !== 'active') return null
       if (t.status === 'welcome' && t.step !== 0) return null
       if (t.status === 'active' && t.step < 1) return null
       if (t.returnPaused!==undefined&&typeof t.returnPaused!=='boolean')return null
-      if (t.phase === 'action' && !t.replay && p.upgrades.includes(lessonDefinitions[t.step].requiredUpgrade)) return null
+      if (t.phase === 'action' && !t.replay && p.upgrades.includes(p.version===6?lessonDefinitions[t.step].requiredUpgrade:({3:'cpu',4:'memory',5:'ssd'} as Record<number,string>)[t.step])) return null
       s.tutorial = { ...t }; syncTutorial(s)
       if (training(s)) s.paused=t.phase==='explain'
-      for (const key of ['cloudProvisioned', 'aiProvisioned', 'scaleTimer'] as const) { if (!finite(p[key], 0, key === 'cloudProvisioned' ? (p.version===5?8:84 + s.equipmentLevels.cloud * 6) : key === 'aiProvisioned' ? (p.version===5?4:48 + s.equipmentLevels.ai * 4) : 10.000001)) return null; s[key] = p[key] }
+      for (const key of ['cloudProvisioned', 'aiProvisioned', 'scaleTimer'] as const) { if (!finite(p[key], 0, key === 'cloudProvisioned' ? (p.version===6?1e12:p.version===5?8:84 + s.equipmentLevels.cloud * 6) : key === 'aiProvisioned' ? (p.version===6?1e12:p.version===5?4:48 + s.equipmentLevels.ai * 4) : 10.000001)) return null; s[key] = p[key] }
       if (!p.upgradeTimes || typeof p.upgradeTimes !== 'object') return null
       for (const id of ids) if (p.upgradeTimes[id] !== undefined) { if (!finite(p.upgradeTimes[id], 0, s.elapsed)) return null; s.upgradeTimes[id] = p.upgradeTimes[id] }
     } else {
@@ -612,15 +589,15 @@ export const loadGame = (value: string): GameState | null => {
         return {...a,illustration:tech?.id??(a.kind==='incident'?s.incident?.kind:undefined),tip:tech?TECHNOLOGY_TIPS[tech.id]:undefined}
       })
     }
-    if(p.version===5){
-      if(!finite(p.storageUsedGiB)||typeof p.rentalsEnabled!=='boolean'||!p.provisioning||!Number.isInteger(p.provisioning.target)||!finite(p.provisioning.target,0,8)||!Number.isInteger(p.provisioning.gpuTarget)||!finite(p.provisioning.gpuTarget,0,4)||!finite(p.provisioning.remaining,0,2))return null
+    if(p.version>=5){
+      if(!finite(p.storageUsedGiB)||typeof p.rentalsEnabled!=='boolean'||!p.provisioning||!Number.isInteger(p.provisioning.target)||!finite(p.provisioning.target,0,p.version===6?1e12:8)||!Number.isInteger(p.provisioning.gpuTarget)||!finite(p.provisioning.gpuTarget,0,p.version===6?1e12:4)||!finite(p.provisioning.remaining,0,2))return null
       if(!Number.isInteger(s.cloudProvisioned)||!Number.isInteger(s.aiProvisioned)||(!owned(s,'cloud')&&s.cloudProvisioned!==0)||(!owned(s,'ai')&&s.aiProvisioned!==0)||(!p.rentalsEnabled&&(s.cloudProvisioned!==0||s.aiProvisioned!==0)))return null
       if(!['purchases','rewards'].every(k=>finite(p.revenue[k]))||!finite(p.revenue.opening,-1e15))return null
       s.revenue={...s.revenue,purchases:p.revenue.purchases,rewards:p.revenue.rewards,opening:p.revenue.opening}
       const balance=s.revenue.opening+s.revenue.gross+s.revenue.grants+s.revenue.rewards-s.revenue.purchases-s.revenue.expenses
       if(Math.abs(balance-s.cash)>.01)return null
       s.storageUsedGiB=p.storageUsedGiB;s.rentalsEnabled=p.rentalsEnabled;s.provisioning={...p.provisioning}
-      if(s.storageUsedGiB>getHardware(s).storageGiB)return null
+      if(p.version<6&&s.storageUsedGiB>getHardware(s).storageGiB)return null
     }else{
       // Preserve all purchases and funds. Opening balance bridges accounting that old saves never recorded.
       s.revenue.opening=s.cash-s.revenue.gross-s.revenue.grants+s.revenue.expenses
@@ -628,23 +605,43 @@ export const loadGame = (value: string): GameState | null => {
       s.aiProvisioned=owned(s,'ai')?clamp(Math.ceil(s.aiProvisioned/8),1,4):0
       s.lastPurchase=null
       s.announcements=s.announcements.map(a=>({...a,impact:undefined}))
-      if(s.incident)s.incident.stats=emptyEventStats(true)
       addLog(s,'Lab upgraded to real hardware units. Your funds and purchases were preserved.','good')
     }
+    if(p.version===6){
+      if(!Number.isSafeInteger(p.companyLevel)||!finite(p.companyLevel,1,Number.MAX_SAFE_INTEGER)||!finite(p.levelQuota,.001)||!finite(p.levelProgress,0,p.levelQuota+.001)||Math.abs(p.levelQuota-quotaForLevel(p.companyLevel))>Math.max(.001,p.levelQuota*1e-10))return null
+      if(!p.fleet||!['servers','storageGroups','networkLinks'].every(k=>Number.isSafeInteger(p.fleet[k])&&finite(p.fleet[k],1,1e12)))return null
+      if(p.fleet.servers>1&&!owned(s,'server2'))return null
+      if(!p.budgetGuard||typeof p.budgetGuard.enabled!=='boolean'||!finite(p.budgetGuard.lossSeconds)||!['healthy','warning','recovering'].includes(p.budgetGuard.status))return null
+      if(!Array.isArray(p.claimedAchievementIDs)||new Set(p.claimedAchievementIDs).size!==p.claimedAchievementIDs.length||p.claimedAchievementIDs.some((id:string)=>!s.achievementIDs.includes(id)))return null
+      if(!Number.isSafeInteger(p.claimedCheckpointLevel)||!finite(p.claimedCheckpointLevel,0,p.companyLevel-1)||p.claimedCheckpointLevel%5!==0)return null
+      if(!Number.isSafeInteger(p.eventCheckpoint)||!finite(p.eventCheckpoint,0,p.companyLevel)||p.eventCheckpoint%5!==0||!finite(p.eventQuietSeconds,0,45)||!finite(p.activeSeconds)||!finite(p.workloadOffset,0,p.companyLevel-1)||(p.aiLaunchLevel!==null&&!finite(p.aiLaunchLevel,-100,p.companyLevel)))return null
+      s.companyLevel=p.companyLevel;s.levelQuota=p.levelQuota;s.levelProgress=p.levelProgress;s.fleet={...p.fleet};s.budgetGuard={...p.budgetGuard};s.claimedAchievementIDs=[...p.claimedAchievementIDs];s.claimedCheckpointLevel=p.claimedCheckpointLevel;s.eventCheckpoint=p.eventCheckpoint;s.eventQuietSeconds=p.eventQuietSeconds;s.activeSeconds=p.activeSeconds;s.aiLaunchLevel=p.aiLaunchLevel;s.workloadOffset=p.workloadOffset
+      if(s.storageUsedGiB>getHardware(s).storageGiB)return null
+    }else{
+      const previousDemand=finite(p.metrics?.demand)?p.metrics.demand:45
+      const quietDemand=previousDemand/(s.incident?.kind==='marketing'?1.5:1)/(s.challenge.active?2:1)
+      s.companyLevel=Math.max(1,Math.floor(Math.max(0,quietDemand/45-1)/.07)+1);s.levelQuota=quotaForLevel(s.companyLevel);s.levelProgress=0;s.workloadOffset=s.companyLevel-1
+      s.fleet={servers:owned(s,'server2')?2:1,storageGroups:1,networkLinks:1};s.claimedAchievementIDs=[...s.achievementIDs];s.claimedCheckpointLevel=Math.floor((s.companyLevel-1)/5)*5;s.eventCheckpoint=Math.floor(s.companyLevel/5)*5;s.activeSeconds=s.elapsed/s.speed;s.aiLaunchLevel=owned(s,'ai')?s.companyLevel-9:null
+      if(s.incident){const old=s.incident,fraction=old.remaining/old.total,replacement=makeIncident(old.kind,s);replacement.remaining=replacement.total*fraction;replacement.stats=old.stats?{...old.stats,missedByStage:{...old.stats.missedByStage},durationSeconds:old.stats.durationSeconds??old.stats.duration/s.speed,partial:true}:emptyEventStats(true);s.incident=replacement}
+      const mapping:Record<number,number>={0:0,1:1,2:2,3:3,4:6,5:7,6:8,7:10};s.tutorial.step=mapping[s.tutorial.step]??10
+      if(s.tutorial.status==='active'){if(s.tutorial.phase==='demo'||s.tutorial.demonstrated)moveTutorial(s,Math.min(10,s.tutorial.step+1));else{s.tutorial.phase=[1,2,4,5,8,9].includes(s.tutorial.step)?'action':s.tutorial.phase;s.paused=s.tutorial.phase==='explain'}}
+      s.announcements=[];s.acknowledgedAnnouncements=[];s.incidentQueue=[];s.lastPurchase=null;if(s.incident)announceIncident(s);syncTutorial(s)
+      addLog(s,'Your company now has reliable-work levels and fleet expansion. Earlier rewards stay claimed.','good')
+    }
     if(p.uiRevision!==undefined&&p.uiRevision!==2)return null
-    if(p.uiRevision!==2){
+    if(p.uiRevision!==2&&p.version===6){
       s.acknowledgedAnnouncements=[...new Set([...s.acknowledgedAnnouncements,...s.announcements.map(a=>a.id)])]
       s.announcements=[]
       if(s.tutorial.status==='active'){
         const t=s.tutorial
-        if(t.phase==='demo'||t.demonstrated)moveTutorial(s,Math.min(7,t.step+1))
-        else if([1,2,6].includes(t.step)){t.phase='action';s.paused=false}
+        if(t.phase==='demo'||t.demonstrated)moveTutorial(s,Math.min(10,t.step+1))
+        else if([1,2,4,5,8,9].includes(t.step)){t.phase='action';s.paused=false}
         else s.paused=t.phase==='explain'
       }
       if(s.incident)announceIncident(s)
       addLog(s,'Interface updated. Earlier notifications remain in event history.','info')
     }
-    s.uiRevision=2
+    s.uiRevision=2;s.acknowledgedAnnouncements=[]
     s.metrics = calculateMetrics(s)
     return s
   } catch { return null }

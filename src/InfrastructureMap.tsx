@@ -2,10 +2,10 @@ import type {KeyboardEvent} from 'react'
 import type {GameState} from './sim/types'
 import {getHardware} from './sim/engine'
 import {useSceneCamera} from './useSceneCamera'
-type Props={state:GameState;selected:string;setSelected:(id:string)=>void;highlight?:string;beginner?:boolean;focus?:string;compact?:boolean}
-const n=(v:number)=>v.toLocaleString(undefined,{maximumFractionDigits:1})
-export default function InfrastructureMap({state,selected,setSelected,focus,compact=false,highlight}:Props){
- const {svgRef,viewBox}=useSceneCamera(1120,590,focus,compact)
+type Props={state:GameState;selected:string;setSelected:(id:string)=>void;highlight?:string;beginner?:boolean;focus?:string;focusKey?:number;compact?:boolean}
+const n=(v:number)=>v.toLocaleString(undefined,{notation:v>=10000?'compact':'standard',maximumFractionDigits:1})
+export default function InfrastructureMap({state,selected,setSelected,focus,focusKey,compact=false,highlight}:Props){
+ const {svgRef,viewBox}=useSceneCamera(1120,590,focus,compact,focusKey)
  const canonical=(id:string)=>id==='gateway'?'network':id==='storage'?'ssd':id
  const mapped=(id:string)=>['cpu','memory','virtualization','server2'].includes(id)?'server':id==='security'?'network':canonical(id)
  const picked=mapped(highlight??selected)
@@ -31,7 +31,7 @@ export default function InfrastructureMap({state,selected,setSelected,focus,comp
  <text x="36" y="206" className="route-note">ARRIVE</text><text x="579" y="85" className="route-note response">CACHE HIT / RETURN</text><text x="589" y="321" className="route-note">APP ROUTES</text><text x="936" y="373" className="route-note">AI ONLY</text><text x="361" y="447" className="route-note">REJECTIONS FROM CAPACITY LIMITS</text>{!compact&&<text x="46" y="562" className="route-note">Each moving segment represents sampled traffic, not one request.</text>}
  {node('customers',21,230,'CUSTOMERS',`${n(m.demand)} requests/s`)}{node('network',210,230,'NETWORK',has('security')?'Protected uplink':'Customer uplink')}
  {node('cache',410,59,'EDGE CACHE',`${n(m.cacheHits)} hits/s`,has('cache'))}{node('load_balancer',410,230,has('load_balancer')?'BALANCER':'DIRECT ROUTE',has('load_balancer')?'Healthy targets':'One server')}
- {node('server',625,171,'APPLICATION',`${h.serverCount} physical servers`,true,160)}{node('cloud',625,349,'CLOUD APP',state.provisioning.remaining>0&&state.provisioning.target>h.cloudInstances?'Starting…':`${h.cloudInstances} rented VMs`,has('cloud'),160)}
+ {node('server',625,171,'APPLICATION',`${n(h.serverCount)} physical servers`,true,160)}{node('cloud',625,349,'CLOUD APP',state.provisioning.remaining>0&&state.provisioning.target>h.cloudInstances?'Starting…':`${n(h.cloudInstances)} rented VMs`,has('cloud'),160)}
  {node('ssd',850,230,'STORAGE (SSD)',`${n(h.storageIOPS)} IOPS`)}{node('ai',850,445,'AI / GPU',state.provisioning.remaining>0&&state.provisioning.gpuTarget>h.gpuCount?'Starting…':`${n(m.aiServed)} responses/s`,has('ai'))}{node('response',850,59,'RESPONSES',`${n(m.served)} completed/s`)}{node('rejected',210,445,'REJECTED',`${n(m.dropped)} requests/s`,m.dropped>0)}
  </svg></section>
 }

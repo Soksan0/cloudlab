@@ -1,527 +1,322 @@
-import { expect, test, type Page } from '@playwright/test'
-import { readFile } from 'node:fs/promises'
-import {
-  acknowledgeAnnouncement, calculateMetrics, createInitialState, getNextAnnouncement,
-  purchaseEquipment, purchaseUpgrade, serializeGame, skipTutorial,
-  stepGame, triggerIncident,
-} from '../src/sim/engine'
-import { UPGRADES } from '../src/sim/upgrades'
-import type { GameState, UpgradeId } from '../src/sim/types'
-
-const SAVE_KEY = 'cloudlab-save-v1'
-const pageErrors = new WeakMap<Page, string[]>()
-test.beforeEach(async ({ page }) => {
-  const errors: string[] = []; pageErrors.set(page, errors)
-  page.on('pageerror', error => errors.push(error.message))
-})
-test.afterEach(async ({ page }) => {
-  expect(pageErrors.get(page), 'No unhandled browser errors').toEqual([])
-})
-function acknowledgeAll(state: GameState) {
-  let next = getNextAnnouncement(state)
-  while (next) { state = acknowledgeAnnouncement(state, next.id); next = getNextAnnouncement(state) }
-  return state
+import {expect,test,type Page,type Locator} from '@playwright/test'
+import {readFile} from 'node:fs/promises'
+import {acknowledgeAnnouncement,calculateMetrics,createInitialState,getNextAnnouncement,purchaseEquipment,purchaseUpgrade,serializeGame,skipTutorial,stepGame,triggerIncident} from '../src/sim/engine'
+import {UPGRADES} from '../src/sim/upgrades'
+import {quotaForLevel} from '../src/sim/hardware'
+import type {GameState,UpgradeId} from '../src/sim/types'
+const SAVE_KEY='cloudlab-save-v1'
+const names:Record<string,string>={cpu:'CPU',memory:'Memory',ssd:'Storage (SSD)',network:'Network',cloud:'Cloud capacity',ai:'AI capacity'}
+const errors=new WeakMap<Page,string[]>()
+test.beforeEach(async({page})=>{const list:string[]=[];errors.set(page,list);page.on('pageerror',error=>list.push(error.message))})
+test.afterEach(async({page})=>{expect(errors.get(page),'No unhandled browser errors').toEqual([])})
+function ack(state:GameState){let s=state,next=getNextAnnouncement(s);while(next){s=acknowledgeAnnouncement(s,next.id);next=getNextAnnouncement(s)}return s}
+function fund(s:GameState,cash=1_000_000){const r=s.revenue;r.opening=cash-r.gross-r.grants-r.rewards+r.purchases+r.expenses;s.cash=cash;return s}
+function sandbox(upgrades:UpgradeId[]=[]){let s=fund(skipTutorial(createInitialState()));for(const id of upgrades)s=ack(purchaseUpgrade(s,id));s.incident=null;s.incidentQueue=[];s.nextIncidentAt=1e6;s.reputation=80;s.paused=false;s.metrics=calculateMetrics(s);return s}
+function full(){return ack(stepGame(sandbox(UPGRADES.map(u=>u.id)),2.1))}
+function healthy(){let s=full();for(const id of ['cpu','memory','ssd','network'] as const)s=purchaseEquipment(s,id,'max');return s}
+async function openGame(page:Page,state?:GameState|string){await page.clock.install();await page.addInitScript(({key,save})=>{if(!sessionStorage.getItem('cloudlab-test-initialized')){localStorage.clear();if(save)localStorage.setItem(key,save);sessionStorage.setItem('cloudlab-test-initialized','yes')}},{key:SAVE_KEY,save:typeof state==='string'?state:state?serializeGame(state):null});await page.goto('/');await page.clock.runFor(450)}
+async function snapshot(page:Page):Promise<GameState>{return page.evaluate(key=>{window.dispatchEvent(new Event('pagehide'));return JSON.parse(localStorage.getItem(key)!)},SAVE_KEY)}
+function balanced(s:GameState){const r=s.revenue;expect(s.cash).toBeCloseTo(r.opening+r.gross+r.grants+r.rewards-r.purchases-r.expenses,6)}
+async function utility(page:Page,name:string){await page.getByRole('button',{name:'Menu',exact:true}).click();await page.getByRole('button',{name,exact:true}).click()}
+async function dashboard(page:Page,tab='Performance'){if(!await page.getByTestId('performance-dashboard').isVisible())await page.getByRole('button',{name:'Performance & Operations',exact:true}).click();await page.getByTestId('performance-dashboard').getByRole('button',{name:tab,exact:true}).click();return page.getByTestId('performance-dashboard')}
+async function closeDashboard(page:Page){if(await page.getByTestId('performance-dashboard').isVisible())await page.getByRole('button',{name:'Close dashboard',exact:true}).click()}
+async function choose(page:Page,id:string,category:'Equipment'|'Technology'='Equipment'){
+ await closeDashboard(page)
+ if(await page.getByRole('button',{name:/^Tune components/}).isVisible())await page.getByRole('button',{name:/^Tune components/}).click()
+ const panel=page.getByTestId('tuning-console');await panel.getByRole('button',{name:category,exact:true}).click()
+ const chooser=panel.getByRole('combobox',{name:'Component',exact:true});await chooser.click()
+ const name=category==='Equipment'?names[id]:UPGRADES.find(u=>u.id===id)!.name
+ await page.getByRole('option',{name,exact:true}).click();await page.clock.runFor(450)
+ await expect(chooser).toHaveAttribute('data-value',id)
 }
-function fund(state: GameState, cash: number) {
-  const r = state.revenue
-  r.opening = cash - r.gross - r.grants - r.rewards + r.purchases + r.expenses
-  state.cash = cash
-  return state
+async function continueMajor(page:Page){for(let i=0;i<20&&await page.getByTestId('major-announcement').isVisible();i++)await page.getByTestId('major-announcement').getByRole('button',{name:/^Continue/}).click()}
+async function finishTutorial(page:Page,stopAt?:number){
+ for(let i=0;i<50;i++){
+  const coach=page.getByTestId('tutorial-coach');if(!await coach.isVisible())return
+  const step=Number(await coach.getAttribute('data-step')),phase=await coach.getAttribute('data-phase')
+  if(step===stopAt)return
+  if(phase==='explain'||await coach.getByRole('button',{name:/^Continue tutorial/}).isVisible())await coach.getByRole('button',{name:/^Continue tutorial/}).click()
+  else if(step===1)await page.getByRole('button',{name:'Select Server 01',exact:true}).click()
+  else if(step===2)await page.getByRole('button',{name:'Inspect CPU',exact:true}).click()
+  else if(step===3)await page.getByRole('button',{name:'Upgrade CPU',exact:true}).click()
+  else if(step===4)await page.getByRole('button',{name:'Performance & Operations',exact:true}).click()
+  else if(step===5)await page.getByTestId('performance-dashboard').getByRole('button',{name:/^Inspect upgrade/}).click()
+  else if(step===6)await page.getByRole('button',{name:'Upgrade Memory',exact:true}).click()
+  else if(step===7)await page.getByRole('button',{name:'Upgrade Storage (SSD)',exact:true}).click()
+  else if(step===8)await page.getByRole('button',{name:'Achievements',exact:true}).click()
+  else if(step===9)await page.getByRole('button',{name:'Claim rewards',exact:true}).click()
+  else await page.clock.runFor(500)
+ }
+ await expect(page.getByTestId('tutorial-coach')).toBeHidden()
 }
-function sandbox(upgrades: UpgradeId[] = []) {
-  let s = fund(skipTutorial(createInitialState()), 1_000_000)
-  for (const id of upgrades) s = acknowledgeAll(purchaseUpgrade(s, id))
-  s.incident = null; s.incidentQueue = []; s.nextIncidentAt = 1_000_000
-  s.paused = false; s.reputation = 80; s.metrics = calculateMetrics(s)
-  return s
+async function fitsElement(page:Page,element:Locator,label:string){
+ if(!await element.isVisible())return
+ const box=await element.boundingBox(),viewport=page.viewportSize()!;expect(box,`${label} exists`).not.toBeNull()
+ expect(box!.x,`${label} left`).toBeGreaterThanOrEqual(-1);expect(box!.y,`${label} top`).toBeGreaterThanOrEqual(-1)
+ expect(box!.x+box!.width,`${label} right`).toBeLessThanOrEqual(viewport.width+1);expect(box!.y+box!.height,`${label} bottom`).toBeLessThanOrEqual(viewport.height+1)
+ if(label==='Dashboard'){
+  // Projection rays intentionally extend below the panel; interactive content must fit its housing.
+  const content=await element.locator('.dashboard-content').boundingBox();expect(content!.y+content!.height,'Dashboard content fits its housing').toBeLessThanOrEqual(box!.y+box!.height+1)
+  const clipped=await element.evaluate(node=>{const r=node.getBoundingClientRect();return [...node.querySelectorAll('button')].filter(button=>{const b=button.getBoundingClientRect();return b.width>0&&b.height>0&&(b.left<r.left-1||b.right>r.right+1||b.top<r.top-1||b.bottom>r.bottom+1)}).map(button=>button.getAttribute('aria-label')||button.textContent)})
+  expect(clipped,'Dashboard controls stay inside the panel').toEqual([])
+ }else{
+  const dimensions=await element.evaluate(node=>({scroll:node.scrollHeight,client:node.clientHeight}))
+  expect(dimensions.scroll,`${label} no inner scrolling ${JSON.stringify(dimensions)}`).toBeLessThanOrEqual(dimensions.client+1)
+ }
 }
-function completeLab() {
-  return acknowledgeAll(stepGame(sandbox(UPGRADES.map(u => u.id)), 2.1))
-}
-async function openGame(page: Page, state?: GameState | string) {
-  await page.clock.install()
-  await page.addInitScript(({ key, save }) => {
-    if (!sessionStorage.getItem('cloudlab-test-initialized')) {
-      localStorage.clear()
-      if (save) localStorage.setItem(key, save)
-      sessionStorage.setItem('cloudlab-test-initialized', 'yes')
-    }
-  }, { key: SAVE_KEY, save: typeof state === 'string' ? state : state ? serializeGame(state) : null })
-  await page.goto('/')
-  await page.clock.runFor(450)
-}
-async function snapshot(page: Page): Promise<GameState> {
-  return page.evaluate(key => {
-    window.dispatchEvent(new Event('pagehide'))
-    return JSON.parse(localStorage.getItem(key)!)
-  }, SAVE_KEY)
-}
-function expectBalanced(s: GameState) {
-  const r = s.revenue
-  expect(s.cash).toBeCloseTo(r.opening + r.gross + r.grants + r.rewards - r.purchases - r.expenses, 6)
-}
-async function utility(page: Page, name: string) {
-  await page.getByRole('button', { name: 'Menu', exact: true }).click()
-  await page.getByRole('button', { name, exact: true }).click()
-}
-async function selectComponent(page: Page, id: string, category: 'Equipment' | 'Technology' = 'Equipment') {
-  if (await page.getByRole('button', { name: /^Tune components/ }).isVisible()) {
-    await page.getByRole('button', { name: /^Tune components/ }).click()
-  }
-  const console = page.getByTestId('tuning-console')
-  await console.getByRole('button', { name: category, exact: true }).click()
-  await console.getByLabel('Component', { exact: true }).selectOption(id)
-  await page.clock.runFor(450)
-}
-async function continueMajor(page: Page) {
-  for (let i = 0; i < 20 && await page.getByTestId('major-announcement').isVisible(); i++) {
-    await page.getByTestId('major-announcement').getByRole('button', { name: /^Continue/ }).click()
-  }
-}
-async function finishTutorial(page: Page) {
-  for (let i = 0; i < 45; i++) {
-    const coach = page.getByTestId('tutorial-coach')
-    if (!await coach.isVisible()) return
-    const step = Number(await coach.getAttribute('data-step'))
-    const phase = await coach.getAttribute('data-phase')
-    if (phase === 'explain'||await coach.getByRole('button',{name:/^Continue tutorial/}).isVisible()) await coach.getByRole('button', { name: /^Continue tutorial/ }).click()
-    else if (step === 1) await page.getByRole('button', { name: 'Select Server 01', exact: true }).click()
-    else if (step === 2) await page.getByRole('button', { name: 'Inspect CPU', exact: true }).click()
-    else if (step >= 3 && step <= 5) {
-      const name = ['CPU', 'Memory', 'Storage (SSD)'][step - 3]
-      await page.getByTestId('tuning-console').getByRole('button', { name: `Upgrade ${name}`, exact: true }).click()
-    } else if (step === 6) await page.getByRole('button', { name: 'Hint', exact: true }).click()
-    else await page.clock.runFor(500)
-  }
-  await expect(page.getByTestId('tutorial-coach')).toBeHidden()
-}
-async function expectViewportFit(page: Page) {
-  const bounds = await page.evaluate(() => ({
-    w: innerWidth, h: innerHeight,
-    pageW: document.documentElement.scrollWidth,
-    pageH: document.documentElement.scrollHeight,
-  }))
-  expect(bounds.pageW, 'No horizontal page scrolling').toBeLessThanOrEqual(bounds.w + 1)
-  expect(bounds.pageH, 'No vertical page scrolling').toBeLessThanOrEqual(bounds.h + 1)
-  const console = page.getByTestId('tuning-console')
-  if (await console.isVisible()) {
-    const box = await console.boundingBox()
-    expect(box).not.toBeNull()
-    expect(box!.x).toBeGreaterThanOrEqual(0)
-    expect(box!.y).toBeGreaterThanOrEqual(0)
-    expect(box!.x + box!.width).toBeLessThanOrEqual(bounds.w + 1)
-    expect(box!.y + box!.height).toBeLessThanOrEqual(bounds.h + 1)
-    const dimensions = await console.evaluate(node => ({
-      scroll:node.scrollHeight,client:node.clientHeight,
-      children:[...node.children].map(child=>({tag:child.tagName,class:child.className,height:child.getBoundingClientRect().height}))
-    }))
-    expect(dimensions.scroll, `No console scrolling: ${JSON.stringify(dimensions)}`).toBeLessThanOrEqual(dimensions.client+1)
-    const clipped = await console.evaluate(node => {
-      const panel = node.getBoundingClientRect()
-      return [...node.querySelectorAll('button,select')].filter(control => {
-        const r = control.getBoundingClientRect()
-        return r.width > 0 && r.height > 0 && (r.left < panel.left - 1 || r.right > panel.right + 1 || r.top < panel.top - 1 || r.bottom > panel.bottom + 1)
-      }).map(control => control.getAttribute('aria-label') || control.textContent)
-    })
-    expect(clipped, 'Tuning controls are not clipped').toEqual([])
-  }
-  const dialog = page.getByRole('dialog')
-  if (await dialog.isVisible()) {
-    const box = await dialog.boundingBox()
-    expect(box!.x).toBeGreaterThanOrEqual(0)
-    expect(box!.y).toBeGreaterThanOrEqual(0)
-    expect(box!.x + box!.width).toBeLessThanOrEqual(bounds.w + 1)
-    expect(box!.y + box!.height).toBeLessThanOrEqual(bounds.h + 1)
-    expect(await dialog.evaluate(node => node.scrollHeight <= node.clientHeight + 1), 'No dialog scrolling').toBe(true)
-  }
+async function fits(page:Page){
+ const dimensions=await page.evaluate(()=>({w:innerWidth,h:innerHeight,scrollW:document.documentElement.scrollWidth,scrollH:document.documentElement.scrollHeight}))
+ expect(dimensions.scrollW,'No horizontal page scrolling').toBeLessThanOrEqual(dimensions.w+1);expect(dimensions.scrollH,'No vertical page scrolling').toBeLessThanOrEqual(dimensions.h+1)
+ await fitsElement(page,page.getByTestId('tuning-console'),'Console');await fitsElement(page,page.getByRole('listbox'),'Chooser');await fitsElement(page,page.getByTestId('performance-dashboard'),'Dashboard');await fitsElement(page,page.getByRole('dialog'),'Dialog')
+ const panel=page.getByTestId('tuning-console')
+ if(await panel.isVisible()){
+  const clipped=await panel.evaluate(node=>{const panel=node.getBoundingClientRect();return [...node.querySelectorAll('button')].filter(control=>!control.closest('[role="listbox"]')).filter(control=>{const r=control.getBoundingClientRect();return r.width>0&&r.height>0&&(r.left<panel.left-1||r.right>panel.right+1||r.top<panel.top-1||r.bottom>panel.bottom+1)}).map(control=>control.getAttribute('aria-label')||control.textContent)})
+  expect(clipped,'Console controls not clipped').toEqual([])
+ }
 }
 
-test('welcome requires a choice and keeps reading time free', async ({ page }) => {
-  await openGame(page)
-  const dialog = page.getByRole('dialog')
-  await expect(dialog).toContainText('cloud')
-  await page.clock.runFor(5_000)
-  expect((await snapshot(page)).elapsed).toBe(0)
-  await page.getByRole('button', { name: /Open sandbox|Skip to sandbox/ }).click()
-  await expect(dialog).toBeHidden()
-  await expect(page.getByTestId('tuning-console')).toBeVisible()
+test('welcome requires a choice and reading time remains free',async({page})=>{
+ await openGame(page);await expect(page.getByRole('dialog')).toContainText('cloud');await page.clock.runFor(5000);expect((await snapshot(page)).elapsed).toBe(0)
+ await page.getByRole('button',{name:/Open sandbox|Skip to sandbox/}).click();await expect(page.getByTestId('tuning-console')).toBeVisible();await expect(page.getByTestId('company-level')).toContainText('1')
 })
 
-test('a beginner completes live guided actions instead of a text banner', async ({ page }) => {
-  await page.setViewportSize({ width: 1280, height: 720 }); await openGame(page)
-  await page.getByRole('button', { name: /^Start tutorial/ }).click()
-  const coach = page.getByTestId('tutorial-coach')
-  await expect(coach).toBeVisible()
-  const before = await snapshot(page)
-  await page.clock.runFor(2_000)
-  expect((await snapshot(page)).elapsed).toBeGreaterThan(before.elapsed)
-  await finishTutorial(page)
-  const s = await snapshot(page)
-  expect(s.tutorialComplete).toBe(true)
-  expect(s.upgrades).toEqual(expect.arrayContaining(['cpu', 'memory', 'ssd']))
-  expectBalanced(s)
-  await expect(page.locator('.tutorial-strip')).toHaveCount(0)
-  await expectViewportFit(page)
+test('tutorial teaches live monitoring, upgrades and explicit reward claims',async({page})=>{
+ await page.setViewportSize({width:1280,height:720});await openGame(page);await page.getByRole('button',{name:/^Start tutorial/}).click()
+ const before=await snapshot(page);await page.clock.runFor(2000);expect((await snapshot(page)).elapsed).toBeGreaterThan(before.elapsed)
+ await finishTutorial(page);const s=await snapshot(page);expect(s.tutorialComplete).toBe(true);expect(s.upgradeTimes.cpu).toBeLessThanOrEqual(30);expect(s.upgrades).toEqual(expect.arrayContaining(['cpu','memory','ssd']));balanced(s);await fits(page)
 })
 
-test('tutorial action reload resumes the task and skipping preserves the company', async ({ page }) => {
-  await openGame(page)
-  await page.getByRole('button', { name: /^Start tutorial/ }).click()
-  await page.getByRole('button', { name: 'Select Server 01', exact: true }).click()
-  const step = await page.getByTestId('tutorial-coach').getAttribute('data-step')
-  await snapshot(page); await page.reload()
-  await expect(page.getByTestId('tutorial-coach')).toHaveAttribute('data-step', step!)
-  await page.getByRole('button', { name: 'Skip tutorial', exact: true }).click()
-  await expect(page.getByTestId('tutorial-coach')).toBeHidden()
-  expectBalanced(await snapshot(page))
+test('tutorial task reload and replay preserve company finances',async({page})=>{
+ await openGame(page);await page.getByRole('button',{name:/^Start tutorial/}).click();await page.getByRole('button',{name:'Select Server 01',exact:true}).click()
+ const step=await page.getByTestId('tutorial-coach').getAttribute('data-step');await snapshot(page);await page.reload();await expect(page.getByTestId('tutorial-coach')).toHaveAttribute('data-step',step!)
+ await page.getByRole('button',{name:'Skip tutorial',exact:true}).click();await page.getByRole('button',{name:/Pause/}).click();const before=await snapshot(page)
+ await utility(page,'Help');await page.getByRole('button',{name:'Replay tutorial',exact:true}).click();await page.clock.runFor(1500)
+ const replay=await snapshot(page);expect(replay.cash).toBe(before.cash);expect(replay.revenue).toEqual(before.revenue);expect(replay.achievementIDs).toEqual(before.achievementIDs)
+ await page.getByRole('button',{name:'Skip tutorial',exact:true}).click();expect((await snapshot(page)).paused).toBe(true)
 })
 
-test('component choices focus the matching view and concise controls', async ({ page }) => {
-  const s = completeLab(); s.paused = true; await openGame(page, s)
-  for (const id of ['cpu', 'memory', 'ssd', 'network']) {
-    await selectComponent(page, id)
-    await expect(page.getByRole('button', { name: 'Server Interior', exact: true })).toHaveAttribute('aria-pressed', 'true')
-    await expect(page.getByTestId('tuning-console').getByLabel('Component')).toHaveValue(id)
-    const part = await page.locator(`.scene-viewport [data-component-id="${id}"]`).first().boundingBox()
-    const console = await page.getByTestId('tuning-console').boundingBox()
-    expect(part, 'Focused component remains present').not.toBeNull()
-    expect(part!.x).toBeGreaterThanOrEqual(0)
-    expect(part!.x + part!.width, 'Focused component stays beside the tuning console').toBeLessThanOrEqual(console!.x - 3)
-    if(id==='cpu'||id==='network')await page.screenshot({path:`test-results/cloudlab-compact-focused-${id}.png`})
-  }
-  await expect(page.getByTestId('tuning-console')).toContainText(/Mbps|Gbps/)
-  await expect(page.getByTestId('tuning-console')).not.toContainText(/instructions per cycle|assumed 256|requests\/second/)
-  for (const id of ['cloud', 'ai']) {
-    await selectComponent(page, id)
-    await expect(page.getByRole('button', { name: 'Service Flow', exact: true })).toHaveAttribute('aria-pressed', 'true')
-  }
+test('complete tutorial replay changes no live inventory or reward ledger',async({page})=>{
+ const s=full();s.paused=true;await openGame(page,s);const before=await snapshot(page)
+ await utility(page,'Help');await page.getByRole('button',{name:'Replay tutorial',exact:true}).click();await finishTutorial(page)
+ const after=await snapshot(page);expect(after.cash).toBe(before.cash);expect(after.revenue).toEqual(before.revenue);expect(after.equipmentLevels).toEqual(before.equipmentLevels);expect(after.claimedAchievementIDs).toEqual(before.claimedAchievementIDs);expect(after.paused).toBe(true)
 })
 
-test('scene clicks select their controls without leaving the current view', async ({ page }) => {
-  const s = completeLab(); s.paused = true; await openGame(page, s)
-  await page.getByRole('button', { name: 'Server Interior', exact: true }).click()
-  await page.getByRole('button', { name: 'Inspect RAM', exact: true }).click()
-  await expect(page.getByTestId('tuning-console').getByLabel('Component')).toHaveValue('memory')
-  await page.getByRole('button', { name: 'Service Flow', exact: true }).click()
-  await page.locator('[data-component-id="network"]').first().click()
-  await expect(page.getByRole('button', { name: 'Service Flow', exact: true })).toHaveAttribute('aria-pressed', 'true')
-  await expect(page.getByTestId('tuning-console').getByLabel('Component')).toHaveValue('network')
-  await page.getByRole('button', { name: 'Workshop', exact: true }).click()
-  await expect(page.getByTestId('tuning-console').getByLabel('Component')).toHaveValue('network')
+test('tutorial component chooser advances the CPU task and reloading restores reward claim',async({page})=>{
+ await openGame(page);await page.getByRole('button',{name:/^Start tutorial/}).click();await page.getByRole('button',{name:'Select Server 01',exact:true}).click()
+ await choose(page,'cpu');await expect(page.getByTestId('tutorial-coach')).toHaveAttribute('data-step','3')
+ await finishTutorial(page,9);await snapshot(page);await page.reload();await page.clock.runFor(450);await expect(page.getByRole('dialog')).toContainText('Achievements');await expect(page.getByRole('button',{name:'Claim rewards',exact:true})).toBeEnabled()
+ await finishTutorial(page);expect((await snapshot(page)).tutorialComplete).toBe(true)
 })
 
-test('keyboard exploration reframes parts without buying or changing the tuning selection', async ({ page }) => {
-  const s=sandbox();s.paused=true;await openGame(page,s)
-  await selectComponent(page,'cpu')
-  await page.getByRole('button',{name:'Inspect CPU',exact:true}).focus()
-  await page.keyboard.press('Tab');await page.clock.runFor(450)
-  await expect(page.getByRole('button',{name:'Inspect RAM',exact:true})).toBeFocused()
-  await expect(page.getByTestId('tuning-console').getByLabel('Component')).toHaveValue('cpu')
-  const part=await page.locator('.scene-viewport [data-component-id="memory"]').boundingBox()
-  const console=await page.getByTestId('tuning-console').boundingBox()
-  expect(part!.x).toBeGreaterThanOrEqual(0)
-  expect(part!.x+part!.width).toBeLessThanOrEqual(console!.x-3)
-  expect((await snapshot(page)).revenue.purchases).toBe(s.revenue.purchases)
+test('custom chooser uses pixel-styled options and keyboard controls',async({page})=>{
+ const s=sandbox();s.paused=true;await openGame(page,s)
+ const chooser=page.getByRole('combobox',{name:'Component',exact:true});await expect(page.locator('select')).toHaveCount(0)
+ await chooser.click();const list=page.getByRole('listbox');await expect(list).toBeVisible();await fits(page)
+ await page.keyboard.press('End');await page.keyboard.press('Enter');await page.clock.runFor(450);await expect(chooser).toHaveAttribute('data-value','ai');await expect(list).toBeHidden()
+ await chooser.click();await page.keyboard.press('Home');await page.keyboard.press('Enter');await page.clock.runFor(450);await expect(chooser).toHaveAttribute('data-value','cpu')
+ await chooser.click();await page.keyboard.press('Escape');await expect(list).toBeHidden();await expect(chooser).toBeFocused()
+ await chooser.click();await page.getByRole('button',{name:'Hint',exact:true}).click();await expect(list).toBeHidden()
 })
 
-test('missing Storage (SSD) prerequisite leads directly to its upgrade', async ({ page }) => {
-  const s = sandbox(['cpu', 'memory']); s.paused = true; await openGame(page, s)
-  await selectComponent(page, 'virtualization', 'Technology')
-  const console = page.getByTestId('tuning-console')
-  await console.getByRole('button', { name: /^Upgrade Storage \(SSD\)/ }).click()
-  await expect(console.getByLabel('Component')).toHaveValue('ssd')
-  await expect(page.getByRole('button', { name: 'Server Interior', exact: true })).toHaveAttribute('aria-pressed', 'true')
-  await console.getByRole('button', { name: 'Upgrade Storage (SSD)', exact: true }).click()
-  await selectComponent(page, 'virtualization', 'Technology')
-  await expect(console.getByRole('button', { name: 'Unlock Virtualization', exact: true })).toBeEnabled()
+test('performance history is live and bounded during sustained play',async({page})=>{
+ await openGame(page,sandbox());const panel=await dashboard(page)
+ const initial=Number(await panel.getAttribute('data-sample-count'))
+ await page.clock.runFor(65_000)
+ const count=Number(await panel.getAttribute('data-sample-count'))
+ expect(count).toBeGreaterThan(initial);expect(count).toBeLessThanOrEqual(60)
+ const after=await snapshot(page);expect(after.elapsed).toBeGreaterThan(60);expect(after.companyLevel).toBe(1)
 })
 
-test('all technologies are reachable through the selected-component console', async ({ page }) => {
-  const s = sandbox(); s.paused = true; await openGame(page, s)
-  for (const [id, name] of [['cpu', 'CPU'], ['memory', 'Memory'], ['ssd', 'Storage (SSD)']] as const) {
-    await selectComponent(page, id)
-    await page.getByTestId('tuning-console').getByRole('button', { name: `Upgrade ${name}`, exact: true }).click()
-  }
-  for (const upgrade of UPGRADES.filter(u => !['cpu', 'memory', 'ssd'].includes(u.id))) {
-    await selectComponent(page, upgrade.id, 'Technology')
-    const button = page.getByTestId('tuning-console').getByRole('button', { name: `Unlock ${upgrade.name}`, exact: true })
-    await expect(button).toBeEnabled()
-    await button.click()
-    await expect(page.getByTestId('major-announcement')).toBeVisible()
-    await continueMajor(page)
-  }
-  const state = await snapshot(page)
-  expect(state.upgrades).toHaveLength(12)
-  expectBalanced(state)
+test('component choices focus parts beside the console and preserve manual views',async({page})=>{
+ const s=full();s.paused=true;await openGame(page,s)
+ for(const id of ['cpu','memory','ssd','network']){
+  await choose(page,id);await expect(page.getByRole('button',{name:'Server Interior',exact:true})).toHaveAttribute('aria-pressed','true')
+  const part=await page.locator(`.scene-viewport [data-component-id="${id}"]`).first().boundingBox(),panel=await page.getByTestId('tuning-console').boundingBox()
+  expect(part!.x).toBeGreaterThanOrEqual(0);expect(part!.x+part!.width).toBeLessThanOrEqual(panel!.x-3)
+ }
+ await page.getByRole('button',{name:'Service Flow',exact:true}).click();await page.locator('[data-component-id="network"]').first().click();await expect(page.getByRole('button',{name:'Service Flow',exact:true})).toHaveAttribute('aria-pressed','true')
+ await expect(page.getByRole('combobox',{name:'Component',exact:true})).toHaveAttribute('data-value','network')
+ for(const id of ['cloud','ai']){await choose(page,id);await expect(page.getByRole('button',{name:'Service Flow',exact:true})).toHaveAttribute('aria-pressed','true')}
 })
 
-test('upgrade feedback follows the selected component in every view', async ({ page }) => {
-  const s = sandbox(); s.paused = true; await openGame(page, s)
-  for (const view of ['Workshop', 'Server Interior', 'Service Flow']) {
-    await page.getByRole('button', { name: view, exact: true }).click()
-    await page.getByTestId('tuning-console').getByRole('button', { name: 'Upgrade CPU', exact: true }).click()
-    const feedback = page.getByTestId('purchase-feedback')
-    await expect(feedback).toBeVisible()
-    await expect(feedback).toContainText(/LV/)
-    await expect(feedback).toContainText(/→/)
-    await expect(page.getByRole('button', { name: view, exact: true })).toHaveAttribute('aria-pressed', 'true')
-  }
-  expect((await snapshot(page)).equipmentLevels.cpu).toBe(3)
+test('manual camera pan and zoom persist until Fit without accidental selection',async({page})=>{
+ const s=sandbox();s.paused=true;await openGame(page,s);await choose(page,'cpu')
+ const svg=page.locator('.scene-viewport svg').first(),initial=await svg.getAttribute('viewBox')
+ await page.getByRole('button',{name:'Zoom in',exact:true}).click();await page.clock.runFor(450);expect(await svg.getAttribute('viewBox')).not.toBe(initial)
+ const stage=await page.getByTestId('scene-viewport').boundingBox();await page.mouse.move(stage!.x+80,stage!.y+stage!.height*.65);await page.mouse.down();await page.mouse.move(stage!.x+160,stage!.y+stage!.height*.72,{steps:8});await page.mouse.up()
+ const manual=await svg.getAttribute('viewBox'),selected=await page.getByRole('combobox',{name:'Component',exact:true}).getAttribute('data-value')
+ await page.clock.runFor(2000);expect(await svg.getAttribute('viewBox')).toBe(manual);expect(selected).toBe('cpu')
+ await page.getByRole('button',{name:'Fit view',exact:true}).click();await page.clock.runFor(450);expect(await svg.getAttribute('viewBox')).not.toBe(manual)
+ const before=await snapshot(page);const part=await page.locator('[data-component-id="memory"]').first().boundingBox();if(part){await page.mouse.move(part.x+part.width/2,part.y+part.height/2);await page.mouse.down();await page.mouse.move(part.x+part.width/2+60,part.y+part.height/2+30,{steps:6});await page.mouse.up()}
+ expect((await snapshot(page)).revenue.purchases).toBe(before.revenue.purchases)
 })
 
-test('rapid purchases retain the newest level and physical specification feedback', async ({ page }) => {
-  const s = sandbox(); s.paused = true; await openGame(page, s)
-  await selectComponent(page, 'network')
-  const button = page.getByTestId('tuning-console').getByRole('button', { name: 'Upgrade Network', exact: true })
-  await button.click(); await page.clock.runFor(400); await button.click()
-  await expect(page.getByTestId('purchase-feedback')).toContainText('2')
-  await expect(page.getByTestId('purchase-feedback')).toContainText(/500 Mbps/)
-  await page.clock.runFor(700)
-  await expect(page.getByTestId('purchase-feedback')).toBeVisible()
-  const state = await snapshot(page)
-  expect(state.equipmentLevels.network).toBe(2); expectBalanced(state)
+test('camera supports trackpad-style panning, Ctrl-wheel zoom and keyboard alternatives',async({page})=>{
+ const s=sandbox();s.paused=true;await openGame(page,s);await choose(page,'cpu')
+ const svg=page.locator('.scene-viewport svg').first(),box=await svg.boundingBox(),before=await svg.getAttribute('viewBox'),zoom=Number(await svg.getAttribute('data-camera-zoom'))
+ await page.mouse.move(box!.x+100,box!.y+box!.height*.65);await page.mouse.wheel(40,60);await page.clock.runFor(50)
+ expect(await svg.getAttribute('viewBox')).not.toBe(before);expect(Number(await svg.getAttribute('data-camera-zoom'))).toBeCloseTo(zoom,2)
+ await page.keyboard.down('Control');await page.mouse.wheel(0,-60);await page.keyboard.up('Control');await page.clock.runFor(50)
+ expect(Number(await svg.getAttribute('data-camera-zoom'))).toBeGreaterThan(zoom)
+ await svg.focus();const panned=await svg.getAttribute('viewBox');await page.keyboard.press('ArrowRight');expect(await svg.getAttribute('viewBox')).not.toBe(panned)
+ const zoomed=Number(await svg.getAttribute('data-camera-zoom'));await page.keyboard.press('Minus');expect(Number(await svg.getAttribute('data-camera-zoom'))).toBeLessThan(zoomed)
+ await page.keyboard.press('0');await page.clock.runFor(450);await expect(svg).toHaveAttribute('data-camera-mode','focused')
 })
 
-test('unaffordable actions explain the shortfall without successful feedback', async ({ page }) => {
-  const s = fund(sandbox(), 0); s.paused = true; await openGame(page, s)
-  const console = page.getByTestId('tuning-console')
-  await expect(console.getByRole('button', { name: 'Upgrade CPU', exact: true })).toBeDisabled()
-  await expect(console).toContainText(/Need|Short/)
-  await expect(page.getByTestId('purchase-feedback')).toBeHidden()
+test('clicking a visible component keeps a manually framed camera in place',async({page})=>{
+ const s=sandbox();s.paused=true;await openGame(page,s);await choose(page,'cpu');await page.getByRole('button',{name:'Fit view',exact:true}).click();await page.clock.runFor(450)
+ const svg=page.locator('.scene-viewport svg').first();await svg.focus();await page.keyboard.press('ArrowRight');const frame=await svg.getAttribute('viewBox')
+ await page.getByRole('button',{name:'Inspect RAM',exact:true}).click();await page.clock.runFor(450)
+ await expect(page.getByRole('combobox',{name:'Component',exact:true})).toHaveAttribute('data-value','memory');expect(await svg.getAttribute('viewBox')).toBe(frame);await expect(svg).toHaveAttribute('data-camera-mode','manual')
 })
 
-test('the tuning console collapses and reopens without losing its selection', async ({ page }) => {
-  const s = sandbox(); s.paused = true; await openGame(page, s)
-  await selectComponent(page, 'memory')
-  await page.getByRole('button', { name: 'Collapse tuning console', exact: true }).click()
-  await expect(page.getByTestId('tuning-console')).toBeHidden()
-  await page.getByRole('button', { name: /^Tune components/ }).click()
-  await expect(page.getByTestId('tuning-console').getByLabel('Component')).toHaveValue('memory')
+test('missing Storage prerequisite leads directly to an accessible upgrade',async({page})=>{
+ const s=sandbox(['cpu','memory']);s.paused=true;await openGame(page,s);await choose(page,'virtualization','Technology')
+ const panel=page.getByTestId('tuning-console');await panel.getByRole('button',{name:/^Upgrade Storage \(SSD\)/}).click();await expect(page.getByRole('combobox',{name:'Component',exact:true})).toHaveAttribute('data-value','ssd')
+ await panel.getByRole('button',{name:'Upgrade Storage (SSD)',exact:true}).click();await choose(page,'virtualization','Technology');await expect(panel.getByRole('button',{name:'Unlock Virtualization',exact:true})).toBeEnabled()
 })
 
-test('Hint shows a short constraint and navigates to the suggested component', async ({ page }) => {
-  const s = sandbox(); s.paused = true; await openGame(page, s)
-  await page.getByRole('button', { name: 'Hint', exact: true }).click()
-  const hint = page.getByTestId('hint-popover')
-  await expect(hint).toContainText(/CPU|processor/i)
-  await expect(hint).toContainText(/keep up|slow|upgrade/i)
-  await hint.getByRole('button', { name: /^Inspect upgrade/ }).click()
-  await expect(page.getByTestId('tuning-console').getByLabel('Component')).toHaveValue('cpu')
-  await expect(page.getByRole('button', { name: 'Server Interior', exact: true })).toHaveAttribute('aria-pressed', 'true')
+test('all technologies remain reachable and acquisition popups preserve pause',async({page})=>{
+ const s=sandbox();s.paused=true;await openGame(page,s)
+ for(const id of ['cpu','memory','ssd']){await choose(page,id);await page.getByRole('button',{name:`Upgrade ${names[id]}`,exact:true}).click()}
+ for(const item of UPGRADES.filter(u=>!['cpu','memory','ssd'].includes(u.id))){await choose(page,item.id,'Technology');const button=page.getByRole('button',{name:`Unlock ${item.name}`,exact:true});await expect(button).toBeEnabled();await button.click();await expect(page.getByTestId('major-announcement')).toContainText(/Acquired/i);const before=await snapshot(page);await page.clock.runFor(1000);expect((await snapshot(page)).elapsed).toBe(before.elapsed);await continueMajor(page)}
+ const after=await snapshot(page);expect(after.upgrades).toHaveLength(12);expect(after.paused).toBe(true);balanced(after)
 })
 
-test('healthy service gives reassurance without inventing an urgent purchase', async ({ page }) => {
-  const s = sandbox(['cpu']); s.paused = true; s.reputation = 60; s.totalServed = 0; s.metrics = calculateMetrics(s)
-  await openGame(page, s)
-  await page.getByRole('button', { name: 'Hint', exact: true }).click()
-  const hint = page.getByTestId('hint-popover')
-  await expect(hint).toContainText('Everything is working well')
-  await expect(hint.getByRole('button', { name: /^Inspect upgrade/ })).toBeHidden()
+test('upgrade feedback works in all views and rapid purchases retain the newest result',async({page})=>{
+ const s=sandbox();s.paused=true;await openGame(page,s)
+ for(const view of ['Workshop','Server Interior','Service Flow']){await page.getByRole('button',{name:view,exact:true}).click();await page.getByRole('button',{name:'Upgrade CPU',exact:true}).click();await expect(page.getByTestId('purchase-feedback')).toContainText(/LV.*→/);await expect(page.getByRole('button',{name:view,exact:true})).toHaveAttribute('aria-pressed','true')}
+ await choose(page,'network');const button=page.getByRole('button',{name:'Upgrade Network',exact:true});await button.click();await page.clock.runFor(400);await button.click();await expect(page.getByTestId('purchase-feedback')).toContainText(/500 Mbps/);expect((await snapshot(page)).equipmentLevels.network).toBe(2)
 })
 
-test('technology acquisition is a short popup and preserves a manual pause', async ({ page }) => {
-  const s = sandbox(['cpu', 'memory', 'ssd']); s.paused = true; await openGame(page, s)
-  await selectComponent(page, 'virtualization', 'Technology')
-  await page.getByRole('button', { name: 'Unlock Virtualization', exact: true }).click()
-  const dialog = page.getByTestId('major-announcement')
-  await expect(dialog).toContainText(/Acquired.*Virtualization/i)
-  const before = await snapshot(page); await page.clock.runFor(5_000)
-  expect((await snapshot(page)).elapsed).toBe(before.elapsed)
-  await dialog.getByRole('button', { name: /^Continue/ }).click()
-  expect((await snapshot(page)).paused).toBe(true)
-  await expectViewportFit(page)
+test('maximum hardware offers a continued fleet expansion action',async({page})=>{
+ let s=full();s=purchaseEquipment(s,'cpu','max');s.paused=true;await openGame(page,s);await choose(page,'cpu')
+ const before=await snapshot(page);await page.getByRole('button',{name:'Add server',exact:true}).click();const after=await snapshot(page)
+ expect(after.fleet.servers).toBeGreaterThan(before.fleet.servers);expect(after.metrics.hardware.cpuGHz).toBeLessThanOrEqual(3.6);balanced(after)
 })
 
-test('incident start and summary pause reading time and report net results', async ({ page }) => {
-  let s = sandbox(); s.nextIncidentAt = 0; s = triggerIncident(s, 'marketing'); await openGame(page, s)
-  const notice = page.getByTestId('major-announcement')
-  await expect(notice).toContainText(/viral|campaign/i)
-  await expect(notice).toContainText(/25.*minutes/)
-  const before = await snapshot(page); await page.clock.runFor(5_000)
-  expect((await snapshot(page)).elapsed).toBe(before.elapsed)
-  await continueMajor(page); await page.clock.runFor(27_000)
-  const report = page.getByTestId('event-summary')
-  await expect(report).toBeVisible()
-  await expect(report).toContainText(/profit|loss/i)
-  await expect(report).toContainText(/served/i)
-  const finished = await snapshot(page)
-  expect(finished.eventReports[0].duration).toBeCloseTo(25)
-  expect(finished.elapsed).toBeCloseTo(before.elapsed + 25)
-  await page.clock.runFor(4_000)
-  expect((await snapshot(page)).cash).toBe(finished.cash)
-  await continueMajor(page); await page.clock.runFor(1_000)
-  expect((await snapshot(page)).elapsed).toBeGreaterThan(finished.elapsed)
-  expectBalanced(await snapshot(page))
+test('a capped-resource monitor diagnosis links to the repeatable expansion card',async({page})=>{
+ const s=healthy();s.upgrades=s.upgrades.filter(id=>id!=='ai');s.equipmentLevels.ai=0;s.aiProvisioned=0;s.aiLaunchLevel=null;s.provisioning.gpuTarget=0;s.fleet.servers=100;s.companyLevel=2000;s.levelProgress=0;s.levelQuota=quotaForLevel(2000);s.eventCheckpoint=2000;s.metrics=calculateMetrics(s);s.paused=true;expect(s.metrics.bottleneck).toBe('network')
+ await openGame(page,s);const panel=await dashboard(page);await panel.getByRole('button',{name:/^Inspect upgrade/}).click();await expect(page.getByRole('combobox',{name:'Component',exact:true})).toHaveAttribute('data-value','network');await expect(page.getByRole('button',{name:'Add network link',exact:true})).toBeEnabled()
+ const before=await snapshot(page);await page.getByRole('button',{name:'Add network link',exact:true}).click();const after=await snapshot(page);expect(after.fleet.networkLinks).toBe(before.fleet.networkLinks+1);await expect(page.getByTestId('purchase-feedback')).toContainText('FLEET');balanced(after)
 })
 
-test('legacy pending alerts are archived rather than replayed as a backlog', async ({ page }) => {
-  let s = sandbox(['cpu', 'memory', 'ssd']); s = purchaseUpgrade(s, 'virtualization'); s.paused = true
-  const legacy = JSON.parse(serializeGame(s)); delete legacy.uiRevision
-  await openGame(page, JSON.stringify(legacy))
-  await expect(page.getByTestId('major-announcement')).toBeHidden()
-  const restored = await snapshot(page)
-  expect(restored.cash).toBe(s.cash); expect(restored.upgrades).toEqual(s.upgrades)
-  expectBalanced(restored)
+test('rental feedback waits for provisioning before reporting online capacity',async({page})=>{
+ let s=ack(stepGame(sandbox(UPGRADES.filter(u=>!['autoscaling','ai'].includes(u.id)).map(u=>u.id)),2.1));s.paused=true;await openGame(page,s);await choose(page,'cloud');const before=await snapshot(page)
+ await page.getByRole('button',{name:'Upgrade Cloud capacity',exact:true}).click();await expect(page.getByTestId('purchase-feedback')).toContainText(/Starting/);expect((await snapshot(page)).cloudProvisioned).toBe(before.cloudProvisioned)
+ await page.getByRole('button',{name:/Resume/}).click();await page.clock.runFor(1000);expect((await snapshot(page)).cloudProvisioned).toBe(before.cloudProvisioned)
+ await page.clock.runFor(1300);const after=await snapshot(page);expect(after.cloudProvisioned).toBe(before.cloudProvisioned+1);await expect(page.getByTestId('purchase-feedback')).toContainText(/online/);balanced(after)
 })
 
-test('profit badge uses net operating profit and the funds counter has stable dimensions', async ({ page }) => {
-  const s = fund(sandbox(), 95); await openGame(page, s)
-  const cash = page.getByTestId('cash-display'), badge = page.getByTestId('profit-badge')
-  const before = await cash.boundingBox()
-  await expect(badge).toContainText(/Profit.*\+/i)
-  await page.clock.runFor(3_000)
-  const after = await cash.boundingBox()
-  expect(after!.width).toBeCloseTo(before!.width, 1)
-  expect(after!.height).toBeCloseTo(before!.height, 1)
-  await expect(page.locator('.earning-burst')).toHaveCount(0)
-  await expect(badge).toContainText('/min')
-  expectBalanced(await snapshot(page))
+test('failed purchases and collapsed console do not lose selection',async({page})=>{
+ const s=fund(sandbox(),0);s.paused=true;await openGame(page,s);await choose(page,'memory')
+ await expect(page.getByRole('button',{name:'Upgrade Memory',exact:true})).toBeDisabled();await expect(page.getByTestId('tuning-console')).toContainText(/Need|Short/);await expect(page.getByTestId('purchase-feedback')).toBeHidden()
+ await page.getByRole('button',{name:'Collapse tuning console',exact:true}).click();await expect(page.getByTestId('tuning-console')).toBeHidden();await page.getByRole('button',{name:/^Tune components/}).click();await expect(page.getByRole('combobox',{name:'Component',exact:true})).toHaveAttribute('data-value','memory')
 })
 
-test('zero completed requests still show a red operating loss', async ({ page }) => {
-  let s = sandbox(['cpu', 'memory', 'ssd', 'virtualization']); s.nextIncidentAt = 0
-  s = acknowledgeAll(triggerIncident(s, 'hardware')); s.nextIncidentAt = 1_000_000
-  expect(calculateMetrics(s).served).toBe(0)
-  await openGame(page, s)
-  const badge = page.getByTestId('profit-badge')
-  await expect(badge).toContainText(/Profit.*[−-]/i)
-  const color = await badge.evaluate(node => getComputedStyle(node).color)
-  const channels = color.match(/[\d.]+/g)!.map(Number)
-  expect(channels[0]).toBeGreaterThan(channels[1])
-  await page.clock.runFor(1_000)
-  const after = await snapshot(page)
-  expect(after.cash).toBeLessThan(s.cash); expectBalanced(after)
+test('monitor dashboard is obvious, live and available from every view',async({page})=>{
+ await openGame(page,sandbox());await expect(page.getByRole('button',{name:'Open Performance & Operations',exact:true})).toBeVisible();await page.getByRole('button',{name:'Open Performance & Operations',exact:true}).click()
+ const panel=page.getByTestId('performance-dashboard');await expect(panel).toBeVisible();await expect(page.getByTestId('tuning-console')).toBeHidden();const before=await snapshot(page)
+ await page.clock.runFor(3000);const after=await snapshot(page);expect(after.elapsed).toBeGreaterThan(before.elapsed+2.5);expect(after.totalServed).toBeGreaterThan(before.totalServed);await expect(panel).toContainText(/CPU|processor/i)
+ await panel.getByRole('button',{name:/^Inspect upgrade/}).click();await expect(panel).toBeHidden();await expect(page.getByRole('combobox',{name:'Component',exact:true})).toHaveAttribute('data-value','cpu')
+ for(const view of ['Server Interior','Service Flow']){await page.getByRole('button',{name:view,exact:true}).click();await dashboard(page);await expect(panel).toBeVisible();await closeDashboard(page)}
+ await expect(page.locator('.room-sticker')).toHaveCount(0)
 })
 
-test('purchase deductions are immediate and rewards do not become operating profit', async ({ page }) => {
-  const s = sandbox(); s.paused = true; await openGame(page, s)
-  const badge = page.getByTestId('profit-badge'), before = await badge.innerText()
-  await selectComponent(page, 'memory')
-  await page.getByRole('button', { name: 'Upgrade Memory', exact: true }).click()
-  const after = await snapshot(page)
-  expect(after.revenue.purchases).toBe(220)
-  expect(after.revenue.rewards).toBeGreaterThan(0)
-  expect(after.revenue.gross).toBe(0)
-  expect(after.metrics.net).toBe(s.metrics.net)
-  await expect(badge).toHaveText(before)
-  expectBalanced(after)
+test('dashboard finance reconciles and Operations policies do not stop play',async({page})=>{
+ await openGame(page,full());const panel=await dashboard(page,'Finance');await expect(panel).toContainText(/revenue|cost|balance/i);const before=await snapshot(page);await page.clock.runFor(1500);expect((await snapshot(page)).elapsed).toBeGreaterThan(before.elapsed)
+ await panel.getByRole('button',{name:'Operations',exact:true}).click();await panel.getByRole('button',{name:'Scaling',exact:true}).click();const guard=panel.getByRole('switch',{name:'Budget Guard',exact:true});await expect(guard).toHaveAttribute('aria-checked','true');await guard.click();expect((await snapshot(page)).budgetGuard.enabled).toBe(false);await guard.click();expect((await snapshot(page)).budgetGuard.enabled).toBe(true)
+ await panel.getByRole('button',{name:'Stop rentals',exact:true}).click();expect((await snapshot(page)).rentalsEnabled).toBe(false);await panel.getByRole('button',{name:'Resume rentals',exact:true}).click();await page.clock.runFor(2500);expect((await snapshot(page)).metrics.cloud).toBeGreaterThan(0);balanced(await snapshot(page))
 })
 
-test('rented resources show startup before capacity becomes available', async ({ page }) => {
-  const s = completeLab(); await openGame(page, s)
-  await selectComponent(page, 'cloud')
-  const before = await snapshot(page)
-  await page.getByRole('button', { name: 'Upgrade Cloud capacity', exact: true }).click()
-  await expect(page.getByTestId('tuning-console')).toContainText(/Starting|provision/i)
-  expect((await snapshot(page)).cloudProvisioned).toBe(before.cloudProvisioned)
-  await page.clock.runFor(2_500)
-  expect((await snapshot(page)).cloudProvisioned).toBeGreaterThan(before.cloudProvisioned)
+test('menu keeps only utility actions and trophy claims rewards exactly once',async({page})=>{
+ await openGame(page,sandbox());await page.getByRole('button',{name:'Menu',exact:true}).click();const menu=page.getByRole('navigation',{name:'Lab menu',exact:true})
+ for(const item of ['Finance','Operations','Events','Achievements'])await expect(menu.getByRole('button',{name:item,exact:true})).toHaveCount(0)
+ await page.keyboard.press('Escape');const before=await snapshot(page);expect(before.revenue.rewards).toBe(0)
+ await page.getByRole('button',{name:'Achievements',exact:true}).click();await page.getByRole('button',{name:'Claim rewards',exact:true}).click();const claimed=await snapshot(page);expect(claimed.revenue.rewards).toBeGreaterThan(0);balanced(claimed)
+ const receipts=await page.getByTestId('profit-receipts').innerText();await page.keyboard.press('Escape');await page.reload();await page.clock.runFor(450);const reloaded=await snapshot(page);expect(reloaded.revenue.rewards).toBe(claimed.revenue.rewards);expect(receipts).not.toContain('Reward')
 })
 
-test('pause, speed and settings controls preserve the compact playfield', async ({ page }) => {
-  await openGame(page, sandbox())
-  await page.getByRole('button', { name: /Pause/ }).click()
-  const paused = await snapshot(page); await page.clock.runFor(3_000)
-  expect((await snapshot(page)).cash).toBe(paused.cash)
-  await page.getByRole('button', { name: /Resume/ }).click()
-  await page.getByRole('button', { name: '4×', exact: true }).click()
-  await page.clock.runFor(1_000)
-  expect((await snapshot(page)).elapsed).toBeGreaterThan(paused.elapsed + 3.5)
-  await utility(page, 'Settings')
-  await page.getByRole('button', { name: 'Motion on', exact: true }).click()
-  await expect(page.locator('.compact-app')).toHaveClass(/reduced-motion/)
-  await expectViewportFit(page)
+test('healthy service advances company level while overload stalls without escalating demand',async({page})=>{
+ const s=sandbox(['cpu']);s.reputation=60;s.metrics=calculateMetrics(s);await openGame(page,s);await page.clock.runFor(26_000)
+ const after=await snapshot(page);expect(after.companyLevel).toBeGreaterThan(1);expect(after.metrics.demand).toBeGreaterThan(s.metrics.demand);await expect(page.getByTestId('company-level')).toContainText(String(after.companyLevel));balanced(after)
+ await page.reload();const current=await snapshot(page);const demand=current.metrics.demand;await page.clock.runFor(30_000);const stalled=await snapshot(page)
+ if(current.metrics.successRate<.98){expect(stalled.companyLevel).toBe(current.companyLevel);expect(stalled.metrics.demand).toBe(demand);expect(stalled.levelProgress).toBeCloseTo(current.levelProgress,4)}
 })
 
-test('Finance remains accurate in a compact overlay and Escape returns focus', async ({ page }) => {
-  await openGame(page, completeLab())
-  await utility(page, 'Finance')
-  const dialog = page.getByRole('dialog')
-  for (const name of ['Customer revenue', 'Operating expenses', 'Available funds']) await expect(dialog).toContainText(name)
-  await expectViewportFit(page)
-  await page.keyboard.press('Escape'); await expect(dialog).toBeHidden()
-  await expect(page.getByRole('button',{name:'Menu',exact:true})).toBeFocused()
-  expectBalanced(await snapshot(page))
+test('overloaded level preserves progress and does not create a reputation death spiral',async({page})=>{
+ const s=sandbox();s.levelProgress=s.levelQuota*.3;s.paused=false;await openGame(page,s);const before=await snapshot(page);await page.clock.runFor(30_000);const after=await snapshot(page)
+ expect(after.companyLevel).toBe(before.companyLevel);expect(after.metrics.demand).toBe(before.metrics.demand);expect(after.levelProgress).toBeCloseTo(before.levelProgress,6);expect(after.reputation).toBeGreaterThanOrEqual(before.reputation);balanced(after)
 })
 
-test('Save exports valid snapshots and invalid imports leave the company unchanged', async ({ page }) => {
-  const s = sandbox(['cpu']); s.paused = true; await openGame(page, s)
-  await utility(page, 'Save')
-  const exported = page.waitForEvent('download')
-  await page.getByRole('button', { name: 'Export save', exact: true }).click()
-  const path = await (await exported).path()
-  expect(path).not.toBeNull()
-  const saved = JSON.parse(await readFile(path!, 'utf8')) as GameState
-  expect(saved.upgrades).toContain('cpu'); expectBalanced(saved)
-  await page.getByLabel('Import save file', { exact: true }).setInputFiles({name:'invalid.json',mimeType:'application/json',buffer:Buffer.from('{"version":5,"cash":0}')})
-  await expect(page.getByRole('dialog')).toContainText(/invalid/i)
-  await page.keyboard.press('Escape')
-  expect((await snapshot(page)).cash).toBe(s.cash)
-})
-
-test('tutorial replay preserves live finances, achievements, and the manual pause', async ({ page }) => {
-  const s = completeLab(); s.paused = true; await openGame(page, s)
-  const before = await snapshot(page)
-  await utility(page, 'Help')
-  await page.getByRole('button', { name: 'Replay tutorial', exact: true }).click()
-  await page.clock.runFor(2_000)
-  const replay = await snapshot(page)
-  expect(replay.cash).toBe(before.cash); expect(replay.revenue).toEqual(before.revenue)
-  expect(replay.achievementIDs).toEqual(before.achievementIDs)
-  await page.getByRole('button', { name: 'Skip tutorial', exact: true }).click()
-  expect((await snapshot(page)).paused).toBe(before.paused)
-})
-
-test('hidden pages do not earn offline revenue', async ({ page }) => {
-  await openGame(page, sandbox()); const before = await snapshot(page)
-  await page.evaluate(() => {Object.defineProperty(document,'hidden',{configurable:true,get:()=>true});document.dispatchEvent(new Event('visibilitychange'))})
-  await page.clock.runFor(10_000)
-  const hidden = await snapshot(page)
-  expect(hidden.cash).toBeCloseTo(before.cash, 1); expect(hidden.elapsed).toBeCloseTo(before.elapsed, 1)
-  await page.evaluate(() => {Object.defineProperty(document,'hidden',{configurable:true,get:()=>false});document.dispatchEvent(new Event('visibilitychange'))})
-  await page.clock.runFor(1_000)
-  expect((await snapshot(page)).elapsed).toBeGreaterThan(hidden.elapsed)
-})
-
-for (const viewport of [{width:780,height:600},{width:1024,height:600},{width:1280,height:720},{width:1440,height:900},{width:1920,height:1080}]) {
-  test(`desktop ${viewport.width}×${viewport.height} keeps views and overlays inside the viewport`, async ({ page }) => {
-    await page.setViewportSize(viewport)
-    const s = completeLab(); s.paused = true; await openGame(page, s)
-    for (const view of ['Workshop','Server Interior','Service Flow']) {
-      await page.getByRole('button',{name:view,exact:true}).click()
-      await page.screenshot({path:`test-results/cloudlab-compact-${viewport.width}-${view.toLowerCase().replaceAll(' ','-')}.png`})
-      await expectViewportFit(page)
-      await expect(page.getByTestId('tuning-console').getByRole('button',{name:'Upgrade CPU',exact:true})).toBeVisible()
-    }
-    await page.getByRole('button',{name:'Workshop',exact:true}).click()
-    await page.screenshot({path:`test-results/cloudlab-compact-${viewport.width}.png`})
-    for (const name of ['Finance','Operations','Achievements','Events','Help','Save','Settings']) {
-      await utility(page,name); await expectViewportFit(page)
-      await page.getByRole('dialog').getByRole('button',{name:'Close',exact:true}).click()
-    }
-  })
+for(const speed of [1,2,4] as const){
+ test(`event reaction time stays real at ${speed}× and result popups stop reading costs`,async({page})=>{
+  let s=sandbox();s.speed=speed;s=triggerIncident(s,'marketing');await openGame(page,s);const notice=page.getByTestId('major-announcement');await expect(notice).toBeVisible();const before=await snapshot(page);await page.clock.runFor(3000);expect((await snapshot(page)).elapsed).toBe(before.elapsed)
+  await continueMajor(page);await page.clock.runFor(30_000);let active=await snapshot(page);expect(active.incident).not.toBeNull();expect(active.incident!.remaining).toBeCloseTo(45,0)
+  await dashboard(page,'Events');await expect(page.getByTestId('performance-dashboard')).toContainText(/0:45|00:45|45/);await closeDashboard(page)
+  await page.clock.runFor(46_000);await expect(page.getByTestId('event-summary')).toBeVisible();const ended=await snapshot(page),report=ended.eventReports[0];expect(report.durationSeconds).toBeCloseTo(75,1);await page.clock.runFor(3000);expect((await snapshot(page)).cash).toBe(ended.cash);balanced(ended)
+ })
 }
 
-
-test('maximum Storage (SSD) specifications and funding notes fit a compact console',async({page})=>{
-  await page.setViewportSize({width:780,height:600})
-  let s=sandbox();s=purchaseEquipment(s,'ssd','max');s.paused=true
-  await openGame(page,s);await selectComponent(page,'ssd')
-  await expect(page.getByTestId('tuning-console')).toContainText(/16,384/)
-  await expectViewportFit(page)
-  await page.screenshot({path:'test-results/cloudlab-compact-max-storage.png'})
+test('fifth-level checkpoint announces once across reload and no event backlog stacks',async({page})=>{
+ let s=healthy();s.companyLevel=4;s.levelQuota=calculateMetrics(s).demand*60*25;s.levelProgress=s.levelQuota-1;s.eventCheckpoint=0;s.eventQuietSeconds=0;s.metrics=calculateMetrics(s);s=stepGame(s,.1);expect(s.companyLevel).toBe(5);expect(s.incident).not.toBeNull()
+ await openGame(page,s);await expect(page.getByTestId('major-announcement')).toBeVisible();const id=(await snapshot(page)).announcements[0].id;await snapshot(page);await page.reload();await expect(page.getByTestId('major-announcement')).toBeVisible();expect((await snapshot(page)).announcements[0].id).toBe(id)
+ await continueMajor(page);await page.clock.runFor(2000);const after=await snapshot(page);expect(after.eventReports).toHaveLength(0);expect(after.incidentQueue).toHaveLength(0)
 })
 
+test('subdued receipts show operating profit only and remain bounded',async({page})=>{
+ await openGame(page,sandbox());await page.clock.runFor(4000);const receipts=page.getByTestId('profit-receipts');await expect(receipts).toContainText(/\+/);expect(await page.getByTestId('profit-receipt').count()).toBeLessThanOrEqual(3)
+ await page.getByRole('button',{name:/Pause/}).click();const before=await snapshot(page);await choose(page,'memory');await page.getByRole('button',{name:'Upgrade Memory',exact:true}).click();await page.clock.runFor(2000);const after=await snapshot(page);expect(after.revenue.gross).toBe(before.revenue.gross);expect(after.revenue.rewards).toBe(0);expect(await page.getByTestId('profit-receipt').count()).toBe(0);balanced(after)
+})
 
-test('all locked technology and equipment cards fit the smallest desktop window',async({page})=>{
-  await page.setViewportSize({width:780,height:600})
-  const s=sandbox();s.paused=true;await openGame(page,s)
-  for(const id of ['cpu','memory','ssd','network','cloud','ai']){
-    await selectComponent(page,id)
-    await expectViewportFit(page)
-  }
-  for(const item of UPGRADES.filter(u=>!['cpu','memory','ssd'].includes(u.id))){
-    await selectComponent(page,item.id,'Technology')
-    await expectViewportFit(page)
-  }
+test('zero completed requests show negative profit and stable HUD dimensions',async({page})=>{
+ let s=sandbox(['cpu','memory','ssd','virtualization']);s=ack(triggerIncident(s,'hardware'));s.metrics=calculateMetrics(s);expect(s.metrics.served).toBe(0);await openGame(page,s)
+ const badge=page.getByTestId('profit-badge'),cash=page.getByTestId('cash-display'),before=await cash.boundingBox();await expect(badge).toContainText(/Profit.*[−-]/i)
+ const channels=(await badge.evaluate(node=>getComputedStyle(node).color)).match(/[\d.]+/g)!.map(Number);expect(channels[0]).toBeGreaterThan(channels[1]);await page.clock.runFor(1500);const after=await cash.boundingBox();expect(after!.width).toBeCloseTo(before!.width,1);expect(after!.height).toBeCloseTo(before!.height,1);expect((await snapshot(page)).cash).toBeLessThan(s.cash)
+})
+
+test('legacy companies retain purchases and treat already paid achievements as claimed',async({page})=>{
+ const s=sandbox(['cpu','memory','ssd']);s.paused=true;s.achievementIDs=['first-equipment'];s.revenue.rewards=100;fund(s,4321)
+ const legacy={...s,version:5,announcements:[{id:'achievement-1',kind:'achievement',title:'Previously earned',body:'Already paid before migration.',actionLabel:'Continue'}],announcementSequence:1};await openGame(page,JSON.stringify(legacy));const after=await snapshot(page)
+ expect(after.version).toBe(6);expect(after.cash).toBe(4321);expect(after.upgrades).toEqual(s.upgrades);expect(after.claimedAchievementIDs).toContain('first-equipment');await expect(page.getByTestId('major-announcement')).toBeHidden();expect(await page.evaluate(()=>JSON.parse(localStorage.getItem('cloudlab-save-pre-v6')!).version)).toBe(5);balanced(after)
+})
+
+test('Save exports snapshots and invalid imports preserve the company',async({page})=>{
+ const s=sandbox(['cpu']);s.paused=true;await openGame(page,s);await utility(page,'Save');const download=page.waitForEvent('download');await page.getByRole('button',{name:'Export save',exact:true}).click();const path=await(await download).path();const saved=JSON.parse(await readFile(path!,'utf8')) as GameState;expect(saved.upgrades).toContain('cpu');balanced(saved)
+ await page.getByLabel('Import save file',{exact:true}).setInputFiles({name:'invalid.json',mimeType:'application/json',buffer:Buffer.from('{"version":6,"cash":0}')});await expect(page.getByRole('dialog')).toContainText(/invalid/i);await page.keyboard.press('Escape');expect((await snapshot(page)).cash).toBe(s.cash)
+})
+
+test('pause, speed and settings preserve the compact playfield',async({page})=>{
+ await openGame(page,sandbox());await page.getByRole('button',{name:/Pause/}).click();const before=await snapshot(page);await page.clock.runFor(3000);expect((await snapshot(page)).cash).toBe(before.cash)
+ await page.getByRole('button',{name:/Resume/}).click();await page.getByRole('button',{name:'4×',exact:true}).click();await page.clock.runFor(1000);expect((await snapshot(page)).elapsed).toBeGreaterThan(before.elapsed+3.5)
+ await utility(page,'Settings');await page.getByRole('button',{name:'Motion on',exact:true}).click();await expect(page.locator('.compact-app')).toHaveClass(/reduced-motion/);await fits(page)
+})
+
+test('hidden pages freeze both financial and active event clocks',async({page})=>{
+ let s=ack(triggerIncident(sandbox(),'marketing'));await openGame(page,s);const before=await snapshot(page)
+ await page.evaluate(()=>{Object.defineProperty(document,'hidden',{configurable:true,get:()=>true});document.dispatchEvent(new Event('visibilitychange'))});await page.clock.runFor(10_000);const hidden=await snapshot(page);expect(hidden.cash).toBeCloseTo(before.cash,1);expect(hidden.elapsed).toBeCloseTo(before.elapsed,1);expect(hidden.incident!.remaining).toBeCloseTo(before.incident!.remaining,1)
+ await page.evaluate(()=>{Object.defineProperty(document,'hidden',{configurable:true,get:()=>false});document.dispatchEvent(new Event('visibilitychange'))});await page.clock.runFor(1000);expect((await snapshot(page)).elapsed).toBeGreaterThan(hidden.elapsed)
+})
+
+for(const viewport of [{width:780,height:600},{width:1024,height:600},{width:1280,height:720},{width:1440,height:900},{width:1920,height:1080}]){
+ test(`desktop ${viewport.width}×${viewport.height} keeps views, chooser and live dashboard inside the viewport`,async({page})=>{
+  await page.setViewportSize(viewport);const s=full();s.paused=true;await openGame(page,s)
+  for(const view of ['Workshop','Server Interior','Service Flow']){await page.getByRole('button',{name:view,exact:true}).click();await page.clock.runFor(450);await fits(page);await page.screenshot({path:`test-results/cloudlab-endless-${viewport.width}-${view.toLowerCase().replaceAll(' ','-')}.png`})}
+  const chooser=page.getByRole('combobox',{name:'Component',exact:true});await chooser.click();await fits(page);await page.keyboard.press('Escape')
+  for(const tab of ['Performance','Finance','Operations','Events']){await dashboard(page,tab);await fits(page);await page.screenshot({path:`test-results/cloudlab-dashboard-${viewport.width}-${tab.toLowerCase()}.png`})}
+  await closeDashboard(page);await page.getByRole('button',{name:'Achievements',exact:true}).click();await fits(page);await page.getByRole('dialog').getByRole('button',{name:'Close',exact:true}).click()
+  for(const name of ['Help','Save','Settings']){await utility(page,name);await fits(page);await page.getByRole('dialog').getByRole('button',{name:'Close',exact:true}).click()}
+ })
+}
+
+test('all locked cards and highest storage tier stay compact',async({page})=>{
+ await page.setViewportSize({width:780,height:600});const s=sandbox();s.paused=true;await openGame(page,s)
+ for(const id of ['cpu','memory','ssd','network','cloud','ai']){await choose(page,id);await fits(page)}
+ for(const item of UPGRADES.filter(u=>!['cpu','memory','ssd'].includes(u.id))){await choose(page,item.id,'Technology');await fits(page)}
+})
+
+test('capped equipment prerequisites and fleet cards fit the compact desktop',async({page})=>{
+ await page.setViewportSize({width:780,height:600});let s=sandbox();for(const id of ['cpu','memory','ssd','network'] as const)s=purchaseEquipment(s,id,'max');s.paused=true;await openGame(page,s)
+ for(const id of ['cpu','memory','ssd','network']){await choose(page,id);await fits(page)}
+ await choose(page,'cpu');await page.getByRole('button',{name:'Inspect Load Balancer',exact:false}).click();await expect(page.getByRole('combobox',{name:'Component',exact:true})).toHaveAttribute('data-value','load_balancer');await fits(page)
 })
