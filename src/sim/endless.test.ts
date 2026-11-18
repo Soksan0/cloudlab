@@ -2,13 +2,22 @@ import {describe,expect,it} from 'vitest'
 import {ACHIEVEMENTS,acknowledgeAnnouncement,calculateMetrics,claimRewards,createInitialState,expandFleet,getClaimableRewards,getEquipmentQuote,getExpansionQuote,getHardware,getNextAnnouncement,getRecommendation,loadGame,purchaseEquipment,purchaseUpgrade,serializeGame,setBudgetGuard,skipTutorial,stepGame,triggerIncident} from './engine'
 import {levelDemand,MAX_LEVELS,quotaForLevel,workloadMix} from './hardware'
 import {UPGRADES} from './upgrades'
-import type {EquipmentId,FleetPool,GameState} from './types'
+import type {EquipmentId,FleetPool,GameState,UpgradeId} from './types'
 const ack=(s:GameState)=>{let a=getNextAnnouncement(s);while(a){s=acknowledgeAnnouncement(s,a.id);a=getNextAnnouncement(s)}return s}
 const lab=(cash=1e6)=>{const s=skipTutorial(createInitialState());s.cash=cash;s.revenue.opening=cash;return s}
 const at=(s:GameState,n:number)=>{s.companyLevel=n;s.levelQuota=quotaForLevel(n);s.levelProgress=0;s.metrics=calculateMetrics(s);return s}
 const full=()=>{let s=lab();for(const u of UPGRADES)s=ack(purchaseUpgrade(s,u.id));for(const id of ['cpu','memory','ssd','network'] as EquipmentId[])s=purchaseEquipment(s,id,'max');return stepGame(s,2.1)}
 const balance=(s:GameState)=>{const r=s.revenue;expect(Math.abs(s.cash-(r.opening+r.gross+r.grants+r.rewards-r.purchases-r.expenses))).toBeLessThan(.001)}
 const nextLevel=(s:GameState)=>{s.levelProgress=s.levelQuota-1;return stepGame(s,.01)}
+
+it('benchmarks economy candidates without changing production balance',()=>{
+ const results=[]
+ for(const factor of [1,1.18,1.22,1.25]){let s=skipTutorial(createInitialState());s.speed=4;let purchases=0
+  for(let second=0;second<200;second++){s=ack(s);const id=getRecommendation(s).upgradeId;if(id){const equipment=['cpu','memory','ssd','network','cloud','ai'].includes(id),quote=equipment?getEquipmentQuote(s,id as EquipmentId):null,cost=(quote?.cost??UPGRADES.find(u=>u.id===id)?.cost??0),extra=cost*(factor**Math.min(purchases,30)-1);if(s.cash>=cost+extra){const next=equipment?purchaseEquipment(s,id as EquipmentId):purchaseUpgrade(s,id as UpgradeId);if(next!==s){s=next;s.cash-=extra;s.revenue.purchases+=extra;purchases++}}}s=stepGame(ack(s),1)}
+  const income=s.revenue.opening+s.revenue.gross+s.revenue.grants+s.revenue.rewards,ratio=s.cash/Math.max(1,income);balance(s);expect(Number.isFinite(ratio)).toBe(true);results.push({factor,level:s.companyLevel,purchases,cash:Math.round(s.cash),unspentRatio:Number(ratio.toFixed(3))})
+ }
+ console.info('Economy candidate benchmarks (200 active seconds, 4x)',JSON.stringify(results))
+})
 
 describe('reliable work levels',()=>{
  it('gives an initial CPU improvement 25 seconds of stable traffic before the next level',()=>{let s=purchaseEquipment(lab(),'cpu');expect(s.metrics.successRate).toBe(1);s=stepGame(s,24.9);expect(s.companyLevel).toBe(1);expect(s.metrics.demand).toBe(45);s=stepGame(s,.1);expect(s.companyLevel).toBe(2);expect(s.metrics.demand).toBeCloseTo(48.15);expect(s.levelProgress).toBe(0)})

@@ -204,11 +204,11 @@ export const getEffectiveUpgrades = (s: GameState): UpgradeId[] => {
   })
 }
 
-export const calculateMetrics=(state:GameState):Metrics=>{
+export const calculateMetrics=(state:GameState,trafficMultiplier=1):Metrics=>{
  const effective=getEffectiveUpgrades(state),s=training(state)&&state.tutorial.replay?{...state,upgrades:effective,equipmentLevels:{cpu:effective.includes('cpu')?1:0,memory:effective.includes('memory')?1:0,ssd:effective.includes('ssd')?1:0,network:0,cloud:0,ai:0},fleet:{servers:1,storageGroups:1,networkLinks:1},storageUsedGiB:32,incident:null}:state
  const h=getHardware(s),w=WORKLOAD,mix=training(s)?{cpuHeavy:0,dataHeavy:0,ai:0}:workloadMix(s)
  if(training(s))h.networkMbps=1000
- const demand=demandFor(s),aiShare=owned(s,'ai')?(s.challenge.active?Math.max(.35,mix.ai):mix.ai):0,aiDemand=demand*aiShare,standardDemand=demand-aiDemand
+ const demand=demandFor(s)*Math.max(.5,Math.min(2,trafficMultiplier)),aiShare=owned(s,'ai')?(s.challenge.active?Math.max(.35,mix.ai):mix.ai):0,aiDemand=demand*aiShare,standardDemand=demand-aiDemand
  const stdCPU=1+mix.cpuHeavy+mix.dataHeavy*.1,stdMemory=1+(mix.cpuHeavy+mix.dataHeavy)*.25,stdOps=w.operations*(1+mix.dataHeavy*3),stdIo=w.ioMiB*(1+mix.dataHeavy*3),stdNet=1+mix.dataHeavy
  const standardPrice=STANDARD_PRICE*(1+mix.cpuHeavy+mix.dataHeavy*.6),aiPrice=AI_PRICE
  let network=h.networkMbps*1e6/(w.networkKiB*1024*8)
@@ -264,15 +264,15 @@ const lessonDefinitions=[
 export const getTutorialLesson=(s:GameState)=>({...lessonDefinitions[s.tutorial.step]??lessonDefinitions[0],actionLabel:s.tutorial.step===10?'Run my lab':'Continue tutorial',nextLabel:s.tutorial.step===10?'Run my lab':'Continue tutorial',progress:s.tutorial.step+1})
 const syncTutorial=(s:GameState)=>{s.tutorialStep=s.tutorial.step;s.tutorialComplete=s.tutorial.status==='complete'||s.tutorial.status==='skipped'}
 const moveTutorial=(s:GameState,step:number)=>{s.tutorial.step=Math.min(10,step);s.tutorial.phase=[1,2,4,5,8,9].includes(step)?'action':'explain';s.tutorial.demoRemaining=0;s.tutorial.demonstrated=false;s.paused=s.tutorial.phase==='explain';syncTutorial(s)}
-export const startTutorial=(state:GameState)=>{const s=structuredClone(state);s.tutorial={status:'active',step:1,phase:'action',demoRemaining:0,replay:false,demonstrated:false};s.paused=false;syncTutorial(s);s.metrics=calculateMetrics(s);return s}
+export const startTutorial=(state:GameState)=>{const s=structuredClone(state);s.tutorial={status:'active',step:1,phase:'action',demoRemaining:0,replay:false,demonstrated:false,returnPaused:state.tutorial.status==='welcome'?false:state.paused};s.paused=false;syncTutorial(s);s.metrics=calculateMetrics(s);return s}
 export const replayTutorial=(state:GameState)=>{const s=startTutorial(state);s.tutorial.replay=true;s.tutorial.returnPaused=state.paused;s.metrics=calculateMetrics(s);return s}
-export const skipTutorial=(state:GameState)=>{const s=structuredClone(state),replay=s.tutorial.replay;s.tutorial.status='skipped';s.tutorial.phase='explain';s.tutorial.demoRemaining=0;s.paused=replay?(s.tutorial.returnPaused??false):false;syncTutorial(s);s.metrics=calculateMetrics(s);addLog(s,'Open Lab online. Watch performance and upgrade the bottleneck.','good');if(!replay)awardAchievements(s);return s}
+export const skipTutorial=(state:GameState)=>{const s=structuredClone(state),replay=s.tutorial.replay;s.tutorial.status='skipped';s.tutorial.phase='explain';s.tutorial.demoRemaining=0;s.paused=s.tutorial.returnPaused??false;syncTutorial(s);s.metrics=calculateMetrics(s);addLog(s,'Open Lab online. Watch performance and upgrade the bottleneck.','good');if(!replay)awardAchievements(s);return s}
 export const tutorialAction=(state:GameState,action:TutorialAction)=>{const t=state.tutorial;if(t.status!=='active'||t.phase!=='action'||getTutorialLesson(state).expectedAction!==action)return state;if(action==='claim-rewards'&&!t.replay&&getClaimableRewards(state).count>0)return state;const s=structuredClone(state);moveTutorial(s,t.step+1);s.metrics=calculateMetrics(s);return s}
 export const advanceTutorial=(state:GameState)=>{
  if(state.tutorial.status!=='active'||state.tutorial.phase!=='explain')return state
  const s=structuredClone(state),t=s.tutorial
- if(t.step===10){t.status='complete';s.paused=t.replay?(t.returnPaused??false):false;addLog(s,'Orientation complete. Build your fleet.','good');if(!t.replay)awardAchievements(s)}
- else{const upgrade=lessonDefinitions[t.step].requiredUpgrade;if(!upgrade)return state;if(!t.replay&&owned(s,upgrade))moveTutorial(s,t.step+1);else{t.phase='action';s.paused=false;const grant=t.replay?0:Math.max(0,getEquipmentQuote(s,upgrade as EquipmentId).cost-s.cash);if(grant){s.cash+=grant;s.revenue.grants+=grant;addLog(s,`Training grant: +$${Math.ceil(grant)} for ${upgradeById[upgrade].name}.`,'good')}}}
+ if(t.step===10){t.status='complete';s.paused=t.returnPaused??false;addLog(s,'Orientation complete. Build your fleet.','good');if(!t.replay)awardAchievements(s)}
+ else{const upgrade=lessonDefinitions[t.step].requiredUpgrade;if(!upgrade)return state;if(!t.replay&&owned(s,upgrade))moveTutorial(s,t.step+1);else{t.phase='action';s.paused=false;const grant=t.replay?0:Math.max(0,getEquipmentQuote(s,upgrade as EquipmentId).cost-s.cash);if(grant){s.cash+=grant;s.revenue.grants+=grant;addLog(s,`Training credits: +$${Math.ceil(grant)} for ${upgradeById[upgrade].name}.`,'good')}}}
  syncTutorial(s);s.metrics=calculateMetrics(s);return s
 }
 export const inspectDiagnostics=(s:GameState)=>advanceTutorial(s)
@@ -458,6 +458,7 @@ const tick=(s:GameState,dt:number,realDt:number,current:Metrics)=>{
  awardAchievements(s)
 }
 export const stepGame=(state:GameState,realDelta:number):GameState=>{
+ if(training(state)&&state.tutorial.phase!=='demo')return state
  if(state.paused||getNextAnnouncement(state)||!Number.isFinite(realDelta)||realDelta<=0)return state
  const s=structuredClone(state);let remaining=realDelta
  while(remaining>.000001&&!s.paused&&!getNextAnnouncement(s)){

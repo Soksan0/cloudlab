@@ -1,0 +1,4 @@
+import {describe,it,expect} from 'vitest'
+import {createInitialState,skipTutorial} from './engine'
+import {diagnostics} from './diagnostics'
+describe('derived diagnostics',()=>{it('covers all components without mutating the save',()=>{const s=skipTutorial(createInitialState()),before=JSON.stringify(s),rows=diagnostics(s);expect(rows).toHaveLength(10);expect(rows.every(d=>Number.isFinite(d.utilization+d.capacity+d.load))).toBe(true);expect(rows.find(d=>d.id==='cpu')?.status).toBe('bottleneck');expect(JSON.stringify(s)).toBe(before)});it('reports strained headroom and locked AI safely',()=>{const s=createInitialState();s.metrics.losses.memory=0;s.metrics.utilizations.memory=.8;expect(diagnostics(s).find(d=>d.id==='memory')?.status).toBe('strained');expect(diagnostics(s).find(d=>d.id==='ai')?.capacity).toBe(0)})})

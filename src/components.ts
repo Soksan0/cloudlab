@@ -5,6 +5,7 @@ export type SceneView='Workshop'|'Server Interior'|'Service Flow'
 export type ComponentInfo={id:string;name:string;brief:string;view:SceneView;focus?:string}
 export const EQUIPMENT_IDS:EquipmentId[]=['cpu','memory','ssd','network','cloud','ai']
 export const COMPONENTS:Record<string,ComponentInfo>={
+ autoscaling:{id:'autoscaling',name:'Autoscaling',brief:'Matches rented capacity to admitted traffic.',view:'Service Flow'},
  cpu:{id:'cpu',name:'CPU',brief:'Processes the work behind customer requests.',view:'Server Interior'},
  memory:{id:'memory',name:'Memory',brief:'Keeps active work ready while the server processes it.',view:'Server Interior'},
  ssd:{id:'ssd',name:'Storage (SSD)',brief:'Stores customer data and supplies it when requests need it.',view:'Server Interior'},

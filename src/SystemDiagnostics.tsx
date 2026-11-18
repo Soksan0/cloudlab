@@ -1,0 +1,5 @@
+import type {GameState} from './sim/types'
+import {diagnostics} from './sim/diagnostics'
+export default function SystemDiagnostics({state}:{state:GameState}){const [traffic,setTraffic]=useState(100);const m=traffic===100?state.metrics:calculateMetrics(state,traffic/100);return <section className="system-diagnostics" aria-label="System diagnostics"><div aria-label="Traffic preview"><button disabled={traffic<=50} onClick={()=>setTraffic(v=>v-10)}>− traffic</button><span>Preview {traffic}%</span><button disabled={traffic>=200} onClick={()=>setTraffic(v=>v+10)}>+ traffic</button><button onClick={()=>setTraffic(100)}>Live traffic</button></div><span>{m.served.toFixed(1)} requests/s completed · {m.latency.toFixed(0)} ms latency · {m.dropped.toFixed(1)} requests/s rejected ({((1-m.successRate)*100).toFixed(1)}%)</span><div>{diagnostics(state).slice(0,4).map(d=><span key={d.id} className={d.status}>{d.stage} {Math.round(d.utilization*100)}% · </span>)}</div></section>}
+import {useState} from 'react'
+import {calculateMetrics} from './sim/engine'

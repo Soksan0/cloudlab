@@ -1,0 +1,4 @@
+import {it,expect,vi} from 'vitest'
+import {render,screen,fireEvent,cleanup} from '@testing-library/react'
+import ErrorBoundary from './ErrorBoundary'
+it('contains a render failure and keeps recovery controls usable',()=>{const log=vi.spyOn(console,'error').mockImplementation(()=>{});function Broken():never{throw Error('test display failure')}const close=vi.fn();render(<ErrorBoundary onClose={close}><Broken/></ErrorBoundary>);expect(screen.getByRole('alert')).toBeTruthy();expect(screen.getByRole('button',{name:'Reload'})).toBeTruthy();fireEvent.click(screen.getByRole('button',{name:'Export save'}));expect(screen.getByText('No valid save available to export.')).toBeTruthy();fireEvent.click(screen.getByRole('button',{name:'Close dashboard'}));expect(close).toHaveBeenCalledOnce();cleanup();log.mockRestore()})

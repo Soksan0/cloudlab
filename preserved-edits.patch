@@ -1,0 +1,61 @@
+diff --git a/src/App.tsx b/src/App.tsx
+index 8bcbcb4..745be93 100644
+--- a/src/App.tsx
++++ b/src/App.tsx
+@@ -15,7 +15,7 @@ import {useLiveFeed} from './useLiveFeed'
+ import {MAX_LEVELS} from './sim/hardware'
+ const SAVE_KEY='cloudlab-save-v1',BACKUP_KEY='cloudlab-save-pre-v6'
+ type Utility='Achievements'|'Help'|'Save'|'Settings'|'Learn more'|null
+-type Feedback={id:string;from:number;to:number;before:string;after:string;serial:number;pending:boolean;online?:boolean;fleet?:boolean}
++type Feedback={id:string;from:number;to:number;before:string;after:string;serial:number;pending:boolean;online?:boolean}
+ const technology=UPGRADES.filter(u=>!['cpu','memory','ssd'].includes(u.id))
+ const isEquipment=(id:string):id is EquipmentId=>EQUIPMENT_IDS.includes(id as EquipmentId)
+ function readBackup(){try{return localStorage.getItem(BACKUP_KEY)??localStorage.getItem('cloudlab-save-pre-v5')}catch{return null}}
+@@ -66,12 +66,12 @@ export default function App(){
+  const purchasesKey=JSON.stringify(state.lastPurchase)
+  const sound=useCallback(()=>{if(muted)return;try{const ctx=audio.current??=new AudioContext();void ctx.resume();[440,660].forEach((f,i)=>{const o=ctx.createOscillator(),g=ctx.createGain();o.type='triangle';o.frequency.value=f;const at=ctx.currentTime+i*.06;g.gain.setValueAtTime(.025,at);g.gain.exponentialRampToValueAtTime(.001,at+.12);o.connect(g);g.connect(ctx.destination);o.start(at);o.stop(at+.13)})}catch{setMuted(true)}},[muted])
+  useEffect(()=>{const handle=()=>setVisible(!document.hidden);document.addEventListener('visibilitychange',handle);return()=>document.removeEventListener('visibilitychange',handle)},[])
+- useEffect(()=>{const p=state.lastPurchase;if(seenPurchase.current===purchasesKey)return;seenPurchase.current=purchasesKey;if(!p)return;const from=p.beforeLevel??0,to=p.afterLevel??from+1,fleet=!!p.expansionPool,unit=({servers:'servers',storage:'storage groups',network:'network links',cloud:'cloud workers',ai:'GPU workers'} as Record<string,string>)[p.expansionPool??''];setFeedback(previous=>{const coalesce=previous?.id===p.id&&!!previous.fleet===fleet;return {id:p.id,from:coalesce?previous.from:from,to,before:coalesce?previous.before:fleet?`${from} ${unit}`:primarySpec(p.id,p.before.hardware),after:fleet?`${to} ${unit}`:primarySpec(p.id,p.after.hardware),serial:++feedbackSerial.current,pending:['cloud','ai'].includes(p.id)&&state.provisioning.remaining>0,fleet}});sound();if(feedbackTimer.current)clearTimeout(feedbackTimer.current)},[purchasesKey,sound])
++ useEffect(()=>{const p=state.lastPurchase;if(seenPurchase.current===purchasesKey)return;seenPurchase.current=purchasesKey;if(!p)return;const from=p.beforeLevel??0,to=p.afterLevel??from+1;setFeedback(previous=>({id:p.id,from:previous?.id===p.id?previous.from:from,to,before:previous?.id===p.id?previous.before:primarySpec(p.id,p.before.hardware),after:primarySpec(p.id,p.after.hardware),serial:++feedbackSerial.current,pending:['cloud','ai'].includes(p.id)&&state.provisioning.remaining>0}));sound();if(feedbackTimer.current)clearTimeout(feedbackTimer.current)},[purchasesKey,sound])
+  useEffect(()=>{if(feedbackTimer.current)clearTimeout(feedbackTimer.current);if(feedback&&!blocked)feedbackTimer.current=setTimeout(()=>setFeedback(null),2600);return()=>{if(feedbackTimer.current)clearTimeout(feedbackTimer.current)}},[feedback?.serial,blocked])
+  const previousRentals=useRef({cloud:state.cloudProvisioned,ai:state.aiProvisioned})
+  useEffect(()=>{const before=previousRentals.current;previousRentals.current={cloud:state.cloudProvisioned,ai:state.aiProvisioned};if(!state.rentalsEnabled)return;const id=state.cloudProvisioned>before.cloud?'cloud':state.aiProvisioned>before.ai?'ai':null;if(!id)return;const from=before[id],to=id==='cloud'?state.cloudProvisioned:state.aiProvisioned;setFeedback({id,from:state.equipmentLevels[id],to:state.equipmentLevels[id],before:`${from} ${id==='cloud'?'VMs':'GPUs'} online`,after:`${to} ${id==='cloud'?'VMs':'GPUs'} online`,serial:++feedbackSerial.current,pending:false,online:true})},[state.cloudProvisioned,state.aiProvisioned,state.rentalsEnabled])
+  useEffect(()=>{const key=(e:KeyboardEvent)=>{if(e.key!=='Escape')return;if(menu){setMenu(false);document.querySelector<HTMLButtonElement>('[aria-label="Menu"]')?.focus()}if(hint){setHint(false);document.querySelector<HTMLButtonElement>('[aria-label="Hint"]')?.focus()}};window.addEventListener('keydown',key);return()=>window.removeEventListener('keydown',key)},[menu,hint])
+- useEffect(()=>()=>{if(feedbackTimer.current)clearTimeout(feedbackTimer.current);if(rewardTimer.current)clearTimeout(rewardTimer.current);void audio.current?.close()},[])
++ useEffect(()=>()=>{if(feedbackTimer.current)clearTimeout(feedbackTimer.current);void audio.current?.close()},[])
+  useEffect(()=>{if(!feedback||!stage.current)return;let frame=0,oldX=-1,oldY=-1;const update=()=>{const container=stage.current!,box=container.getBoundingClientRect();let target=container.querySelector(`[data-component-id="${feedback.id}"]`);if(!target)target=container.querySelector('[data-component-id="server"]');const rect=target?.getBoundingClientRect();const consoleRect=container.querySelector('[data-floating-console]')?.getBoundingClientRect();const right=consoleRect?consoleRect.left-box.left-14:box.width-14;const x=Math.max(12,Math.min(right-190,rect?rect.right-box.left+8:box.width*.35));const y=Math.max(62,Math.min(box.height-110,rect?rect.top-box.top:box.height*.4));if(Math.abs(x-oldX)>1||Math.abs(y-oldY)>1){oldX=x;oldY=y;setAnchor({x,y})}frame=requestAnimationFrame(update)};frame=requestAnimationFrame(update);return()=>cancelAnimationFrame(frame)},[feedback,view,consoleOpen])
+  function openDashboard(){dashboardConsole.current=consoleOpen;setConsoleOpen(false);setDashboard(true);setMenu(false);setHint(false);setState(s=>tutorialAction(s,'open-dashboard'))}
+  function closeDashboard(){setDashboard(false);setConsoleOpen(dashboardConsole.current);document.querySelector<HTMLButtonElement>('[aria-label="Performance & Operations"]')?.focus()}
+@@ -81,10 +81,10 @@ export default function App(){
+   if(id==='dashboard'){openDashboard();return}
+   const normalized=componentId(id);setDashboard(false);setFocusKey(v=>v+1);setSelected(normalized);setConsoleOpen(true);setHint(false)
+   const nextGroup=forcedGroup??(isEquipment(normalized)&&(!['cloud','ai'].includes(normalized)||state.upgrades.includes(normalized as UpgradeId))?'equipment':UPGRADES.some(u=>u.id===normalized)?'technology':'equipment');setGroup(nextGroup)
+-  if(origin==='scene'&&id!=='server')setFocus(undefined)
++  if(origin==='scene'&&id!=='server')setFocus(COMPONENTS[normalized]?.focus??normalized)
+   if(origin==='console'){const target=COMPONENTS[normalized];setView(target?.view??'Workshop');setFocus(target?.focus??normalized)}
+   if(origin==='scene'&&id==='server'){setView('Server Interior');setFocus(undefined);setState(s=>tutorialAction(s,'inspect-server'))}
+-  if(normalized==='cpu')setState(s=>tutorialAction(s,'select-cpu'))
++  if(origin==='scene'&&normalized==='cpu')setState(s=>tutorialAction(s,'select-cpu'))
+  }
+  const restore=(next:GameState)=>{seenPurchase.current=JSON.stringify(next.lastPurchase);previousRentals.current={cloud:next.cloudProvisioned,ai:next.aiProvisioned};setState(next);setFeedback(null);setEpoch(v=>v+1);setUtility(null);setMenu(false);setHistoryReport(null);setDashboard(false);setFocus(undefined);setSaveNotice('')}
+  const buy=()=>{if(expansionPool){setState(s=>expandFleet(s,expansionPool,quantity));return}if(equipment)setState(s=>purchaseEquipment(s,selected as EquipmentId,guided?1:quantity));else if(tech)setState(s=>purchaseUpgrade(s,tech.id))}
+diff --git a/src/useLiveFeed.ts b/src/useLiveFeed.ts
+index f88882c..65ab8f0 100644
+--- a/src/useLiveFeed.ts
++++ b/src/useLiveFeed.ts
+@@ -1,13 +1,13 @@
+ import {useEffect,useRef,useState} from 'react'
+ import type {GameState} from './sim/types'
+ export type MonitorSample={demand:number;served:number;success:number;profit:number}
+-export type ProfitReceipt={id:number;amount:number;lane:number;createdAt:number}
++export type ProfitReceipt={id:number;amount:number;lane:number}
+ export function useLiveFeed(state:GameState,running:boolean,epoch:number){
+  const latest=useRef(state);latest.current=state;const active=useRef(running);active.current=running
+  const observed=useRef(state.revenue.gross-state.revenue.expenses),remainder=useRef(0),sequence=useRef(0)
+  const [samples,setSamples]=useState<MonitorSample[]>([]),[receipts,setReceipts]=useState<ProfitReceipt[]>([])
+  useEffect(()=>{observed.current=latest.current.revenue.gross-latest.current.revenue.expenses;remainder.current=0;setReceipts([])},[running,epoch])
+  useEffect(()=>{setSamples([])},[epoch])
+- useEffect(()=>{const timer=setInterval(()=>{const s=latest.current,current=s.revenue.gross-s.revenue.expenses;if(!active.current||document.hidden){observed.current=current;return}setSamples(previous=>[...previous.slice(-59),{demand:s.metrics.demand,served:s.metrics.served,success:s.metrics.successRate,profit:s.metrics.net}]);remainder.current+=current-observed.current;observed.current=current;const amount=Math.trunc((remainder.current+Math.sign(remainder.current)*1e-8)*100)/100,now=performance.now();if(Math.abs(amount)>=.01){remainder.current-=amount;const id=++sequence.current;setReceipts(previous=>[...previous.filter(receipt=>now-receipt.createdAt<3200).slice(-2),{id,amount,lane:id%3,createdAt:now}])}else setReceipts(previous=>previous.filter(receipt=>now-receipt.createdAt<3200))},1000);return()=>clearInterval(timer)},[])
++ useEffect(()=>{const timer=setInterval(()=>{const s=latest.current,current=s.revenue.gross-s.revenue.expenses;if(!active.current||document.hidden){observed.current=current;return}setSamples(previous=>[...previous.slice(-59),{demand:s.metrics.demand,served:s.metrics.served,success:s.metrics.successRate,profit:s.metrics.net}]);remainder.current+=current-observed.current;observed.current=current;const amount=Math.trunc((remainder.current+Math.sign(remainder.current)*1e-8)*100)/100;if(Math.abs(amount)>=.01){remainder.current-=amount;const id=++sequence.current;setReceipts(previous=>[...previous.slice(-2),{id,amount,lane:id%3}])}},1000);return()=>clearInterval(timer)},[])
+  return {samples,receipts}
+ }

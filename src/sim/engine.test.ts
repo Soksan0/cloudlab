@@ -14,15 +14,15 @@ function prepared(){let s=full();for(const id of ['cpu','memory','ssd','network'
 
 describe('guided learning',()=>{
  it('leaves a fresh company paused until the welcome choice',()=>{const s=createInitialState();expect(stepGame(s,30)).toEqual(s);expect(s.tutorial.status).toBe('welcome');expect(canPurchase(s,'cpu').ok).toBe(false)})
- it('requires real guided actions and runs service between explanations',()=>{
+ it('requires real guided actions and freezes service during waits',()=>{
   let s=startTutorial(createInitialState());expect(s.paused).toBe(false);expect(s.tutorial.step).toBe(1)
   expect(tutorialAction(s,'open-hint')).toBe(s);expect(advanceTutorial(s)).toBe(s)
-  const active=stepGame(s,1);expect(active.elapsed).toBeGreaterThan(s.elapsed);expect(active.totalServed).toBeGreaterThan(s.totalServed)
+  const active=stepGame(s,1);expect(active).toBe(s)
   s=tutorialAction(active,'inspect-server');expect(s.tutorial.step).toBe(2);expect(s.tutorial.phase).toBe('action')
   s=tutorialAction(s,'select-cpu');expect(s.tutorial.step).toBe(3);expect(s.paused).toBe(true)
   s=guidedPurchases(s,(state,id)=>{
    state=advanceTutorial(state);expect(state.tutorial.phase).toBe('action');expect(state.paused).toBe(false);expect(canPurchase(state,id).ok).toBe(true)
-   const before=stepGame(state,1);expect(before.elapsed).toBeGreaterThan(state.elapsed)
+   const before=stepGame(state,1);expect(before).toBe(state)
    state=purchaseEquipment(before,id);expect(state.lastPurchase?.beforeLevel).toBe(0);expect(state.lastPurchase?.afterLevel).toBe(1);expect(state.lastPurchase?.quantity).toBe(1);balance(state);return state
   })
   expect(s.tutorial.step).toBe(8);expect(s.paused).toBe(false)

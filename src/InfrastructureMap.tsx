@@ -1,5 +1,6 @@
 import type {KeyboardEvent} from 'react'
 import type {GameState} from './sim/types'
+import {diagnostics} from './sim/diagnostics'
 import {getHardware} from './sim/engine'
 import {useSceneCamera} from './useSceneCamera'
 type Props={state:GameState;selected:string;setSelected:(id:string)=>void;highlight?:string;beginner?:boolean;focus?:string;focusKey?:number;compact?:boolean}
@@ -12,6 +13,7 @@ export default function InfrastructureMap({state,selected,setSelected,focus,focu
  const m=state.metrics,h=getHardware(state),has=(id:string)=>state.upgrades.includes(id as never)
  const node=(id:string,x:number,y:number,title:string,value:string,enabled=true,w=150)=>{
   id=canonical(id)
+  const diagnostic=diagnostics(state).find(d=>d.id===id);if(diagnostic)value=String(Math.round(diagnostic.utilization*100))+'% · '+(diagnostic.status==='bottleneck'?'CONSTRAINT':diagnostic.status)
   const key=(e:KeyboardEvent<SVGGElement>)=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();setSelected(id)}}
   const warn=(id==='network'&&m.bottleneck==='network')||(id==='server'&&['compute','memory'].includes(m.bottleneck))||(id==='ssd'&&m.bottleneck==='storage')||(id==='ai'&&m.bottleneck==='ai')
   return <g data-component-id={id} transform={`translate(${x} ${y})`} className={`service-node ${enabled?'':'inactive'} ${warn?'warning':''} ${picked===id?'selected':''}`} role="button" tabIndex={0} aria-label={`Inspect ${title}`} aria-pressed={picked===id} onClick={()=>setSelected(id)} onKeyDown={key}>{(id==='server'?['cpu','memory','virtualization','server2']:id==='network'?['gateway','security']:id==='ssd'?['storage']:[]).map(alias=><rect key={alias} data-component-id={alias} width={w} height="82" fill="transparent" pointerEvents="none"/>)}<rect x="4" y="5" width={w} height="82" fill="#07101d"/><rect width={w} height="82" className="service-node-body"/><path d={`M9 12h${w-18}M9 67h${w-18}`} stroke="currentColor" strokeOpacity=".3"/><text x="12" y="34" className="service-node-name">{title}</text><text x="12" y="55" className="service-node-value">{value}</text><rect x={w-17} y="9" width="5" height="5" fill="currentColor"/></g>

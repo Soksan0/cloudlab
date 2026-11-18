@@ -16,6 +16,10 @@ export function useSceneCamera(width:number,height:number,focus:string|undefined
  useEffect(()=>{
   const svg=svgRef.current
   if(!svg)return
+  const minimap=document.createElement('button')
+  minimap.className='scene-minimap';minimap.setAttribute('aria-label','Minimap: click to center scene; arrows to pan')
+  minimap.innerHTML='<svg viewBox="0 0 100 60" aria-hidden="true"><rect width="100" height="60" fill="#102333"/><path d="M10 30H90M30 12V48M70 12V48" stroke="#426676"/><rect data-map-frame fill="#8de6ce33" stroke="#8de6ce"/></svg>'
+  svg.parentElement?.append(minimap)
   const saved=cameras.get(key)
   const camera:Camera=saved?{...saved,frame:{...saved.frame}}:{frame:{x:0,y:0,width,height},manual:false}
   let animation=0,scheduled=0,suppressClickUntil=0,keyboardNavigation=false
@@ -45,6 +49,8 @@ export function useSceneCamera(width:number,height:number,focus:string|undefined
   const apply=(frame:Frame,g=geometry())=>{
    camera.frame=frame;camera.geometry=g;cameras.set(key,camera)
    svg.setAttribute('viewBox',format(frame))
+   const mapFrame=minimap.querySelector('[data-map-frame]')!
+   mapFrame.setAttribute('x',String(frame.x/width*100));mapFrame.setAttribute('y',String(frame.y/height*60));mapFrame.setAttribute('width',String(Math.min(width,frame.width)*100/width));mapFrame.setAttribute('height',String(Math.min(height,frame.height)*60/height))
    svg.dataset.cameraMode=camera.manual?'manual':'focused'
    svg.dataset.cameraZoom=(g.width/frame.width/g.fit).toFixed(2)
   }
@@ -156,6 +162,8 @@ export function useSceneCamera(width:number,height:number,focus:string|undefined
    if(action==='fit')fit();else if(action==='zoom-in')zoom(1.2);else if(action==='zoom-out')zoom(1/1.2)
   }
   svg.addEventListener('pointerdown',pointerDown)
+  const mapMove=(e:PointerEvent)=>{if(e.type==='pointermove'&&!minimap.hasPointerCapture(e.pointerId))return;e.preventDefault();e.stopPropagation();if(e.type==='pointerdown')minimap.setPointerCapture(e.pointerId);const r=minimap.getBoundingClientRect(),g=geometry();camera.manual=true;apply(bounded({...camera.frame,x:(e.clientX-r.left)/r.width*width-camera.frame.width/2,y:(e.clientY-r.top)/r.height*height-camera.frame.height/2},g),g)}
+  minimap.addEventListener('pointerdown',mapMove);minimap.addEventListener('pointermove',mapMove);minimap.addEventListener('keydown',keyDown)
   svg.addEventListener('pointermove',pointerMove)
   svg.addEventListener('pointerup',pointerUp)
   svg.addEventListener('pointercancel',pointerUp)
@@ -178,6 +186,7 @@ export function useSceneCamera(width:number,height:number,focus:string|undefined
   else if(!saved){apply(fitted(undefined))}
   else resize()
   return()=>{
+   minimap.removeEventListener('pointerdown',mapMove);minimap.removeEventListener('pointermove',mapMove);minimap.removeEventListener('keydown',keyDown);minimap.remove()
    cancelAnimationFrame(animation);cancelAnimationFrame(scheduled);observer.disconnect();changes.disconnect()
    svg.removeEventListener('pointerdown',pointerDown);svg.removeEventListener('pointermove',pointerMove);svg.removeEventListener('pointerup',pointerUp);svg.removeEventListener('pointercancel',pointerUp);svg.removeEventListener('click',click,true);svg.removeEventListener('wheel',wheel);svg.removeEventListener('keydown',keyDown);svg.removeEventListener('focusin',focusIn)
    document.removeEventListener('keydown',documentKey,true);window.removeEventListener('cloudlab-camera',command);window.removeEventListener('resize',schedule)

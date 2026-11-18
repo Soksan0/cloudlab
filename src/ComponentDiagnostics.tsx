@@ -1,0 +1,4 @@
+import type {GameState} from './sim/types'
+import {diagnostics} from './sim/diagnostics'
+import type {MonitorSample} from './useLiveFeed'
+export default function ComponentDiagnostics({state,id,samples}:{state:GameState;id:string;samples:MonitorSample[]}){const d=diagnostics(state).find(d=>d.id===id);if(!d)return null;const points=samples.map((s,i)=>`${i*100/59},${30-(s.utilizations?.[d.stage]??0)*28}`).join(' ');return <details className={'diagnostic-card '+d.status} aria-label="Component diagnostics"><summary>{d.status.toUpperCase()} · {Math.round(d.utilization*100)}% · Diagnostics</summary><div className="diagnostic-detail"><p>{d.reason}</p><svg viewBox="0 0 100 36" role="img" aria-label="Utilization percent over last 60 active seconds"><polyline points={points} stroke="currentColor" fill="none" strokeWidth="1"/><text x="0" y="35" fontSize="5">−60 s</text><text x="90" y="35" fontSize="5">now</text></svg></div></details>}

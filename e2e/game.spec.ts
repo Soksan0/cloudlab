@@ -5,6 +5,10 @@ import {UPGRADES} from '../src/sim/upgrades'
 import {quotaForLevel} from '../src/sim/hardware'
 import type {GameState,UpgradeId} from '../src/sim/types'
 const SAVE_KEY='cloudlab-save-v1'
+test('diagnostic traffic preview is pure and bounded',async({page})=>{const s=full();s.paused=true;await openGame(page,s);const before=await snapshot(page),panel=await dashboard(page);await panel.getByRole('button',{name:'+ traffic',exact:true}).click();await expect(panel).toContainText('Preview 110%');expect(await snapshot(page)).toEqual(before);await panel.getByRole('button',{name:'Live traffic',exact:true}).click();await expect(panel).toContainText('Preview 100%')})
+test('4x presentation keeps bounded nodes and a single camera through view changes',async({page})=>{test.setTimeout(90000);const s=healthy();s.speed=4;await openGame(page,s);await page.clock.resume();await page.evaluate(()=>{(window as unknown as {longTasks:number[]}).longTasks=[];new PerformanceObserver(list=>{for(const entry of list.getEntries())(window as unknown as {longTasks:number[]}).longTasks.push(entry.duration)}).observe({type:'longtask',buffered:false})});for(let second=0;second<60;second+=5){await page.waitForTimeout(5000);await continueMajor(page)}for(let i=0;i<12;i++){await page.getByRole('button',{name:['Workshop','Server Interior','Service Flow'][i%3],exact:true}).click()}await expect(page.locator('.navigable-scene')).toHaveCount(1);await expect(page.getByRole('button',{name:/Minimap:/})).toHaveCount(1);expect(await page.getByTestId('profit-receipt').count()).toBeLessThanOrEqual(3);expect(await page.getByTestId('shroud-message').count()).toBeLessThanOrEqual(1);expect(await page.evaluate(()=>(window as unknown as {longTasks:number[]}).longTasks)).toEqual([])})
+test('Shroud warns once about stalled progress and minimap remains usable',async({page})=>{await openGame(page,sandbox());await page.clock.runFor(16000);await expect(page.getByTestId('shroud-message')).toBeVisible();await expect(page.getByTestId('shroud-message')).toContainText(/CPU|processor|compute/i);await page.getByRole('button',{name:'Dismiss Shroud'}).click();await page.clock.runFor(20000);await expect(page.getByTestId('shroud-message')).toHaveCount(0);const map=page.getByRole('button',{name:/Minimap:/});await expect(map).toBeVisible();await map.click();await expect(page.locator('.navigable-scene')).toHaveAttribute('data-camera-mode','manual')})
+for(const advanced of [false,true])test(`Operations sub-tabs render ${advanced?'advanced':'fresh'} company`,async({page})=>{await openGame(page,advanced?full():sandbox());const panel=await dashboard(page,'Operations');for(const name of ['Traffic','Protection','Scaling','Launch']){await panel.getByRole('button',{name,exact:true}).click();await expect(panel).toBeVisible();await expect(page.getByRole('heading',{name:'Shroud · Display interrupted'})).toHaveCount(0)}if(!advanced){await panel.getByRole('button',{name:'Scaling',exact:true}).click();await expect(panel.getByRole('button',{name:'Inspect Autoscaling →',exact:true})).toBeVisible()}})
 const names:Record<string,string>={cpu:'CPU',memory:'Memory',ssd:'Storage (SSD)',network:'Network',cloud:'Cloud capacity',ai:'AI capacity'}
 const errors=new WeakMap<Page,string[]>()
 test.beforeEach(async({page})=>{const list:string[]=[];errors.set(page,list);page.on('pageerror',error=>list.push(error.message))})
@@ -82,7 +86,7 @@ test('welcome requires a choice and reading time remains free',async({page})=>{
 
 test('tutorial teaches live monitoring, upgrades and explicit reward claims',async({page})=>{
  await page.setViewportSize({width:1280,height:720});await openGame(page);await page.getByRole('button',{name:/^Start tutorial/}).click()
- const before=await snapshot(page);await page.clock.runFor(2000);expect((await snapshot(page)).elapsed).toBeGreaterThan(before.elapsed)
+ const before=await snapshot(page);await page.clock.runFor(2000);expect((await snapshot(page)).elapsed).toBe(before.elapsed)
  await finishTutorial(page);const s=await snapshot(page);expect(s.tutorialComplete).toBe(true);expect(s.upgradeTimes.cpu).toBeLessThanOrEqual(30);expect(s.upgrades).toEqual(expect.arrayContaining(['cpu','memory','ssd']));balanced(s);await fits(page)
 })
 
@@ -115,7 +119,7 @@ test('custom chooser uses pixel-styled options and keyboard controls',async({pag
  await page.keyboard.press('End');await page.keyboard.press('Enter');await page.clock.runFor(450);await expect(chooser).toHaveAttribute('data-value','ai');await expect(list).toBeHidden()
  await chooser.click();await page.keyboard.press('Home');await page.keyboard.press('Enter');await page.clock.runFor(450);await expect(chooser).toHaveAttribute('data-value','cpu')
  await chooser.click();await page.keyboard.press('Escape');await expect(list).toBeHidden();await expect(chooser).toBeFocused()
- await chooser.click();await page.getByRole('button',{name:'Hint',exact:true}).click();await expect(list).toBeHidden()
+ await chooser.click();await page.getByRole('button',{name:'Shroud',exact:true}).click();await expect(list).toBeHidden()
 })
 
 test('performance history is live and bounded during sustained play',async({page})=>{
@@ -215,7 +219,7 @@ test('failed purchases and collapsed console do not lose selection',async({page}
 })
 
 test('monitor dashboard is obvious, live and available from every view',async({page})=>{
- await openGame(page,sandbox());await expect(page.getByRole('button',{name:'Open Performance & Operations',exact:true})).toBeVisible();await page.getByRole('button',{name:'Open Performance & Operations',exact:true}).click()
+ await openGame(page,sandbox());await expect(page.getByRole('button',{name:'Service Flow',exact:true})).toHaveAttribute('aria-pressed','true');await page.getByRole('button',{name:'Workshop',exact:true}).click();await expect(page.getByRole('button',{name:'Open Performance & Operations',exact:true})).toBeVisible();await page.getByRole('button',{name:'Open Performance & Operations',exact:true}).click()
  const panel=page.getByTestId('performance-dashboard');await expect(panel).toBeVisible();await expect(page.getByTestId('tuning-console')).toBeHidden();const before=await snapshot(page)
  await page.clock.runFor(3000);const after=await snapshot(page);expect(after.elapsed).toBeGreaterThan(before.elapsed+2.5);expect(after.totalServed).toBeGreaterThan(before.totalServed);await expect(panel).toContainText(/CPU|processor/i)
  await panel.getByRole('button',{name:/^Inspect upgrade/}).click();await expect(panel).toBeHidden();await expect(page.getByRole('combobox',{name:'Component',exact:true})).toHaveAttribute('data-value','cpu')
