@@ -1,0 +1,2162 @@
+[
+  {
+    "quotaSeconds": 25,
+    "coefficient": 0.02,
+    "strategy": "capacity",
+    "level": 5,
+    "activeSeconds": 127,
+    "cash": 869,
+    "purchases": 5,
+    "purchaseOpportunities": 20,
+    "maxFundingWaitSeconds": 1,
+    "totalFundingWaitSeconds": 1,
+    "lastThreeReserves": [
+      0.528,
+      0.174,
+      0.01
+    ],
+    "maxRecoverySeconds": 3,
+    "servedPercent": 99.56,
+    "recentReserve": 0.237
+  },
+  {
+    "quotaSeconds": 25,
+    "coefficient": 0.02,
+    "strategy": "capacity",
+    "level": 10,
+    "activeSeconds": 253,
+    "cash": 402,
+    "purchases": 9,
+    "purchaseOpportunities": 47,
+    "maxFundingWaitSeconds": 1,
+    "totalFundingWaitSeconds": 1,
+    "lastThreeReserves": [
+      0.061,
+      0.018,
+      0.01
+    ],
+    "maxRecoverySeconds": 3,
+    "servedPercent": 99.8,
+    "recentReserve": 0.03
+  },
+  {
+    "quotaSeconds": 25,
+    "coefficient": 0.02,
+    "strategy": "capacity",
+    "level": 20,
+    "activeSeconds": 477,
+    "cash": 1573,
+    "purchases": 12,
+    "purchaseOpportunities": 96,
+    "maxFundingWaitSeconds": 1,
+    "totalFundingWaitSeconds": 1,
+    "lastThreeReserves": [
+      0.004,
+      0.082,
+      0.003
+    ],
+    "maxRecoverySeconds": 3,
+    "servedPercent": 99.87,
+    "recentReserve": 0.03
+  },
+  {
+    "quotaSeconds": 25,
+    "coefficient": 0.02,
+    "strategy": "capacity",
+    "level": 40,
+    "activeSeconds": 951,
+    "cash": 10444,
+    "purchases": 14,
+    "purchaseOpportunities": 161,
+    "maxFundingWaitSeconds": 1,
+    "totalFundingWaitSeconds": 1,
+    "lastThreeReserves": [
+      0.003,
+      0,
+      0.005
+    ],
+    "maxRecoverySeconds": 3,
+    "servedPercent": 99.92,
+    "recentReserve": 0.003
+  },
+  {
+    "quotaSeconds": 25,
+    "coefficient": 0.02,
+    "strategy": "capacity",
+    "level": 100,
+    "activeSeconds": 2423,
+    "cash": 166291,
+    "purchases": 18,
+    "purchaseOpportunities": 165,
+    "maxFundingWaitSeconds": 1,
+    "totalFundingWaitSeconds": 1,
+    "lastThreeReserves": [
+      0.573,
+      0.569,
+      0.566
+    ],
+    "maxRecoverySeconds": 4,
+    "servedPercent": 99.97,
+    "recentReserve": 0.57
+  },
+  {
+    "quotaSeconds": 25,
+    "coefficient": 0.02,
+    "strategy": "capacity",
+    "level": 1000,
+    "activeSeconds": 24010,
+    "cash": 16268005,
+    "purchases": 96,
+    "purchaseOpportunities": 243,
+    "maxFundingWaitSeconds": 1,
+    "totalFundingWaitSeconds": 1,
+    "lastThreeReserves": [
+      0.908,
+      0.908,
+      0.908
+    ],
+    "maxRecoverySeconds": 11,
+    "servedPercent": 99.94,
+    "recentReserve": 0.908
+  },
+  {
+    "quotaSeconds": 25,
+    "coefficient": 0.02,
+    "strategy": "cache",
+    "level": 5,
+    "activeSeconds": 127,
+    "cash": 869,
+    "purchases": 5,
+    "purchaseOpportunities": 20,
+    "maxFundingWaitSeconds": 1,
+    "totalFundingWaitSeconds": 1,
+    "lastThreeReserves": [
+      0.528,
+      0.174,
+      0.01
+    ],
+    "maxRecoverySeconds": 3,
+    "servedPercent": 99.56,
+    "recentReserve": 0.237
+  },
+  {
+    "quotaSeconds": 25,
+    "coefficient": 0.02,
+    "strategy": "cache",
+    "level": 10,
+    "activeSeconds": 253,
+    "cash": 402,
+    "purchases": 9,
+    "purchaseOpportunities": 47,
+    "maxFundingWaitSeconds": 1,
+    "totalFundingWaitSeconds": 1,
+    "lastThreeReserves": [
+      0.061,
+      0.018,
+      0.01
+    ],
+    "maxRecoverySeconds": 3,
+    "servedPercent": 99.8,
+    "recentReserve": 0.03
+  },
+  {
+    "quotaSeconds": 25,
+    "coefficient": 0.02,
+    "strategy": "cache",
+    "level": 20,
+    "activeSeconds": 477,
+    "cash": 1573,
+    "purchases": 12,
+    "purchaseOpportunities": 96,
+    "maxFundingWaitSeconds": 1,
+    "totalFundingWaitSeconds": 1,
+    "lastThreeReserves": [
+      0.004,
+      0.082,
+      0.003
+    ],
+    "maxRecoverySeconds": 3,
+    "servedPercent": 99.87,
+    "recentReserve": 0.03
+  },
+  {
+    "quotaSeconds": 25,
+    "coefficient": 0.02,
+    "strategy": "cache",
+    "level": 40,
+    "activeSeconds": 951,
+    "cash": 10444,
+    "purchases": 14,
+    "purchaseOpportunities": 161,
+    "maxFundingWaitSeconds": 1,
+    "totalFundingWaitSeconds": 1,
+    "lastThreeReserves": [
+      0.003,
+      0,
+      0.005
+    ],
+    "maxRecoverySeconds": 3,
+    "servedPercent": 99.92,
+    "recentReserve": 0.003
+  },
+  {
+    "quotaSeconds": 25,
+    "coefficient": 0.02,
+    "strategy": "cache",
+    "level": 100,
+    "activeSeconds": 2424,
+    "cash": 162702,
+    "purchases": 18,
+    "purchaseOpportunities": 165,
+    "maxFundingWaitSeconds": 1,
+    "totalFundingWaitSeconds": 1,
+    "lastThreeReserves": [
+      0.573,
+      0.569,
+      0.54
+    ],
+    "maxRecoverySeconds": 4,
+    "servedPercent": 99.97,
+    "recentReserve": 0.561
+  },
+  {
+    "quotaSeconds": 25,
+    "coefficient": 0.02,
+    "strategy": "cache",
+    "level": 1000,
+    "activeSeconds": 23974,
+    "cash": 16311352,
+    "purchases": 86,
+    "purchaseOpportunities": 233,
+    "maxFundingWaitSeconds": 1,
+    "totalFundingWaitSeconds": 1,
+    "lastThreeReserves": [
+      0.911,
+      0.91,
+      0.911
+    ],
+    "maxRecoverySeconds": 10,
+    "servedPercent": 99.94,
+    "recentReserve": 0.911
+  },
+  {
+    "quotaSeconds": 25,
+    "coefficient": 0.04,
+    "strategy": "capacity",
+    "level": 5,
+    "activeSeconds": 127,
+    "cash": 869,
+    "purchases": 5,
+    "purchaseOpportunities": 20,
+    "maxFundingWaitSeconds": 1,
+    "totalFundingWaitSeconds": 1,
+    "lastThreeReserves": [
+      0.528,
+      0.174,
+      0.01
+    ],
+    "maxRecoverySeconds": 3,
+    "servedPercent": 99.56,
+    "recentReserve": 0.237
+  },
+  {
+    "quotaSeconds": 25,
+    "coefficient": 0.04,
+    "strategy": "capacity",
+    "level": 10,
+    "activeSeconds": 253,
+    "cash": 402,
+    "purchases": 9,
+    "purchaseOpportunities": 47,
+    "maxFundingWaitSeconds": 1,
+    "totalFundingWaitSeconds": 1,
+    "lastThreeReserves": [
+      0.061,
+      0.018,
+      0.01
+    ],
+    "maxRecoverySeconds": 3,
+    "servedPercent": 99.8,
+    "recentReserve": 0.03
+  },
+  {
+    "quotaSeconds": 25,
+    "coefficient": 0.04,
+    "strategy": "capacity",
+    "level": 20,
+    "activeSeconds": 477,
+    "cash": 1573,
+    "purchases": 12,
+    "purchaseOpportunities": 96,
+    "maxFundingWaitSeconds": 1,
+    "totalFundingWaitSeconds": 1,
+    "lastThreeReserves": [
+      0.004,
+      0.082,
+      0.003
+    ],
+    "maxRecoverySeconds": 3,
+    "servedPercent": 99.87,
+    "recentReserve": 0.03
+  },
+  {
+    "quotaSeconds": 25,
+    "coefficient": 0.04,
+    "strategy": "capacity",
+    "level": 40,
+    "activeSeconds": 951,
+    "cash": 10444,
+    "purchases": 14,
+    "purchaseOpportunities": 161,
+    "maxFundingWaitSeconds": 1,
+    "totalFundingWaitSeconds": 1,
+    "lastThreeReserves": [
+      0.003,
+      0,
+      0.005
+    ],
+    "maxRecoverySeconds": 3,
+    "servedPercent": 99.92,
+    "recentReserve": 0.003
+  },
+  {
+    "quotaSeconds": 25,
+    "coefficient": 0.04,
+    "strategy": "capacity",
+    "level": 100,
+    "activeSeconds": 2423,
+    "cash": 166291,
+    "purchases": 18,
+    "purchaseOpportunities": 165,
+    "maxFundingWaitSeconds": 1,
+    "totalFundingWaitSeconds": 1,
+    "lastThreeReserves": [
+      0.573,
+      0.569,
+      0.566
+    ],
+    "maxRecoverySeconds": 4,
+    "servedPercent": 99.97,
+    "recentReserve": 0.57
+  },
+  {
+    "quotaSeconds": 25,
+    "coefficient": 0.04,
+    "strategy": "capacity",
+    "level": 1000,
+    "activeSeconds": 24010,
+    "cash": 16211774,
+    "purchases": 96,
+    "purchaseOpportunities": 243,
+    "maxFundingWaitSeconds": 1,
+    "totalFundingWaitSeconds": 1,
+    "lastThreeReserves": [
+      0.905,
+      0.905,
+      0.904
+    ],
+    "maxRecoverySeconds": 11,
+    "servedPercent": 99.94,
+    "recentReserve": 0.905
+  },
+  {
+    "quotaSeconds": 25,
+    "coefficient": 0.04,
+    "strategy": "cache",
+    "level": 5,
+    "activeSeconds": 127,
+    "cash": 869,
+    "purchases": 5,
+    "purchaseOpportunities": 20,
+    "maxFundingWaitSeconds": 1,
+    "totalFundingWaitSeconds": 1,
+    "lastThreeReserves": [
+      0.528,
+      0.174,
+      0.01
+    ],
+    "maxRecoverySeconds": 3,
+    "servedPercent": 99.56,
+    "recentReserve": 0.237
+  },
+  {
+    "quotaSeconds": 25,
+    "coefficient": 0.04,
+    "strategy": "cache",
+    "level": 10,
+    "activeSeconds": 253,
+    "cash": 402,
+    "purchases": 9,
+    "purchaseOpportunities": 47,
+    "maxFundingWaitSeconds": 1,
+    "totalFundingWaitSeconds": 1,
+    "lastThreeReserves": [
+      0.061,
+      0.018,
+      0.01
+    ],
+    "maxRecoverySeconds": 3,
+    "servedPercent": 99.8,
+    "recentReserve": 0.03
+  },
+  {
+    "quotaSeconds": 25,
+    "coefficient": 0.04,
+    "strategy": "cache",
+    "level": 20,
+    "activeSeconds": 477,
+    "cash": 1573,
+    "purchases": 12,
+    "purchaseOpportunities": 96,
+    "maxFundingWaitSeconds": 1,
+    "totalFundingWaitSeconds": 1,
+    "lastThreeReserves": [
+      0.004,
+      0.082,
+      0.003
+    ],
+    "maxRecoverySeconds": 3,
+    "servedPercent": 99.87,
+    "recentReserve": 0.03
+  },
+  {
+    "quotaSeconds": 25,
+    "coefficient": 0.04,
+    "strategy": "cache",
+    "level": 40,
+    "activeSeconds": 951,
+    "cash": 10444,
+    "purchases": 14,
+    "purchaseOpportunities": 161,
+    "maxFundingWaitSeconds": 1,
+    "totalFundingWaitSeconds": 1,
+    "lastThreeReserves": [
+      0.003,
+      0,
+      0.005
+    ],
+    "maxRecoverySeconds": 3,
+    "servedPercent": 99.92,
+    "recentReserve": 0.003
+  },
+  {
+    "quotaSeconds": 25,
+    "coefficient": 0.04,
+    "strategy": "cache",
+    "level": 100,
+    "activeSeconds": 2424,
+    "cash": 162702,
+    "purchases": 18,
+    "purchaseOpportunities": 165,
+    "maxFundingWaitSeconds": 1,
+    "totalFundingWaitSeconds": 1,
+    "lastThreeReserves": [
+      0.573,
+      0.569,
+      0.54
+    ],
+    "maxRecoverySeconds": 4,
+    "servedPercent": 99.97,
+    "recentReserve": 0.561
+  },
+  {
+    "quotaSeconds": 25,
+    "coefficient": 0.04,
+    "strategy": "cache",
+    "level": 1000,
+    "activeSeconds": 23974,
+    "cash": 16267501,
+    "purchases": 86,
+    "purchaseOpportunities": 233,
+    "maxFundingWaitSeconds": 1,
+    "totalFundingWaitSeconds": 1,
+    "lastThreeReserves": [
+      0.908,
+      0.908,
+      0.908
+    ],
+    "maxRecoverySeconds": 10,
+    "servedPercent": 99.94,
+    "recentReserve": 0.908
+  },
+  {
+    "quotaSeconds": 25,
+    "coefficient": 0.06,
+    "strategy": "capacity",
+    "level": 5,
+    "activeSeconds": 127,
+    "cash": 869,
+    "purchases": 5,
+    "purchaseOpportunities": 20,
+    "maxFundingWaitSeconds": 1,
+    "totalFundingWaitSeconds": 1,
+    "lastThreeReserves": [
+      0.528,
+      0.174,
+      0.01
+    ],
+    "maxRecoverySeconds": 3,
+    "servedPercent": 99.56,
+    "recentReserve": 0.237
+  },
+  {
+    "quotaSeconds": 25,
+    "coefficient": 0.06,
+    "strategy": "capacity",
+    "level": 10,
+    "activeSeconds": 253,
+    "cash": 402,
+    "purchases": 9,
+    "purchaseOpportunities": 47,
+    "maxFundingWaitSeconds": 1,
+    "totalFundingWaitSeconds": 1,
+    "lastThreeReserves": [
+      0.061,
+      0.018,
+      0.01
+    ],
+    "maxRecoverySeconds": 3,
+    "servedPercent": 99.8,
+    "recentReserve": 0.03
+  },
+  {
+    "quotaSeconds": 25,
+    "coefficient": 0.06,
+    "strategy": "capacity",
+    "level": 20,
+    "activeSeconds": 477,
+    "cash": 1573,
+    "purchases": 12,
+    "purchaseOpportunities": 96,
+    "maxFundingWaitSeconds": 1,
+    "totalFundingWaitSeconds": 1,
+    "lastThreeReserves": [
+      0.004,
+      0.082,
+      0.003
+    ],
+    "maxRecoverySeconds": 3,
+    "servedPercent": 99.87,
+    "recentReserve": 0.03
+  },
+  {
+    "quotaSeconds": 25,
+    "coefficient": 0.06,
+    "strategy": "capacity",
+    "level": 40,
+    "activeSeconds": 951,
+    "cash": 10444,
+    "purchases": 14,
+    "purchaseOpportunities": 161,
+    "maxFundingWaitSeconds": 1,
+    "totalFundingWaitSeconds": 1,
+    "lastThreeReserves": [
+      0.003,
+      0,
+      0.005
+    ],
+    "maxRecoverySeconds": 3,
+    "servedPercent": 99.92,
+    "recentReserve": 0.003
+  },
+  {
+    "quotaSeconds": 25,
+    "coefficient": 0.06,
+    "strategy": "capacity",
+    "level": 100,
+    "activeSeconds": 2423,
+    "cash": 166291,
+    "purchases": 18,
+    "purchaseOpportunities": 165,
+    "maxFundingWaitSeconds": 1,
+    "totalFundingWaitSeconds": 1,
+    "lastThreeReserves": [
+      0.573,
+      0.569,
+      0.566
+    ],
+    "maxRecoverySeconds": 4,
+    "servedPercent": 99.97,
+    "recentReserve": 0.57
+  },
+  {
+    "quotaSeconds": 25,
+    "coefficient": 0.06,
+    "strategy": "capacity",
+    "level": 1000,
+    "activeSeconds": 24010,
+    "cash": 16155549,
+    "purchases": 96,
+    "purchaseOpportunities": 243,
+    "maxFundingWaitSeconds": 1,
+    "totalFundingWaitSeconds": 1,
+    "lastThreeReserves": [
+      0.902,
+      0.901,
+      0.901
+    ],
+    "maxRecoverySeconds": 11,
+    "servedPercent": 99.94,
+    "recentReserve": 0.901
+  },
+  {
+    "quotaSeconds": 25,
+    "coefficient": 0.06,
+    "strategy": "cache",
+    "level": 5,
+    "activeSeconds": 127,
+    "cash": 869,
+    "purchases": 5,
+    "purchaseOpportunities": 20,
+    "maxFundingWaitSeconds": 1,
+    "totalFundingWaitSeconds": 1,
+    "lastThreeReserves": [
+      0.528,
+      0.174,
+      0.01
+    ],
+    "maxRecoverySeconds": 3,
+    "servedPercent": 99.56,
+    "recentReserve": 0.237
+  },
+  {
+    "quotaSeconds": 25,
+    "coefficient": 0.06,
+    "strategy": "cache",
+    "level": 10,
+    "activeSeconds": 253,
+    "cash": 402,
+    "purchases": 9,
+    "purchaseOpportunities": 47,
+    "maxFundingWaitSeconds": 1,
+    "totalFundingWaitSeconds": 1,
+    "lastThreeReserves": [
+      0.061,
+      0.018,
+      0.01
+    ],
+    "maxRecoverySeconds": 3,
+    "servedPercent": 99.8,
+    "recentReserve": 0.03
+  },
+  {
+    "quotaSeconds": 25,
+    "coefficient": 0.06,
+    "strategy": "cache",
+    "level": 20,
+    "activeSeconds": 477,
+    "cash": 1573,
+    "purchases": 12,
+    "purchaseOpportunities": 96,
+    "maxFundingWaitSeconds": 1,
+    "totalFundingWaitSeconds": 1,
+    "lastThreeReserves": [
+      0.004,
+      0.082,
+      0.003
+    ],
+    "maxRecoverySeconds": 3,
+    "servedPercent": 99.87,
+    "recentReserve": 0.03
+  },
+  {
+    "quotaSeconds": 25,
+    "coefficient": 0.06,
+    "strategy": "cache",
+    "level": 40,
+    "activeSeconds": 951,
+    "cash": 10444,
+    "purchases": 14,
+    "purchaseOpportunities": 161,
+    "maxFundingWaitSeconds": 1,
+    "totalFundingWaitSeconds": 1,
+    "lastThreeReserves": [
+      0.003,
+      0,
+      0.005
+    ],
+    "maxRecoverySeconds": 3,
+    "servedPercent": 99.92,
+    "recentReserve": 0.003
+  },
+  {
+    "quotaSeconds": 25,
+    "coefficient": 0.06,
+    "strategy": "cache",
+    "level": 100,
+    "activeSeconds": 2424,
+    "cash": 162702,
+    "purchases": 18,
+    "purchaseOpportunities": 165,
+    "maxFundingWaitSeconds": 1,
+    "totalFundingWaitSeconds": 1,
+    "lastThreeReserves": [
+      0.573,
+      0.569,
+      0.54
+    ],
+    "maxRecoverySeconds": 4,
+    "servedPercent": 99.97,
+    "recentReserve": 0.561
+  },
+  {
+    "quotaSeconds": 25,
+    "coefficient": 0.06,
+    "strategy": "cache",
+    "level": 1000,
+    "activeSeconds": 23974,
+    "cash": 16223660,
+    "purchases": 86,
+    "purchaseOpportunities": 233,
+    "maxFundingWaitSeconds": 1,
+    "totalFundingWaitSeconds": 1,
+    "lastThreeReserves": [
+      0.905,
+      0.905,
+      0.906
+    ],
+    "maxRecoverySeconds": 10,
+    "servedPercent": 99.94,
+    "recentReserve": 0.905
+  },
+  {
+    "quotaSeconds": 35,
+    "coefficient": 0.02,
+    "strategy": "capacity",
+    "level": 5,
+    "activeSeconds": 180,
+    "cash": 1047,
+    "purchases": 6,
+    "purchaseOpportunities": 27,
+    "maxFundingWaitSeconds": 1,
+    "totalFundingWaitSeconds": 1,
+    "lastThreeReserves": [
+      0.3,
+      0.031,
+      0.026
+    ],
+    "maxRecoverySeconds": 3,
+    "servedPercent": 99.64,
+    "recentReserve": 0.119
+  },
+  {
+    "quotaSeconds": 35,
+    "coefficient": 0.02,
+    "strategy": "capacity",
+    "level": 10,
+    "activeSeconds": 344,
+    "cash": 101,
+    "purchases": 10,
+    "purchaseOpportunities": 63,
+    "maxFundingWaitSeconds": 1,
+    "totalFundingWaitSeconds": 1,
+    "lastThreeReserves": [
+      0.007,
+      0.001,
+      0.003
+    ],
+    "maxRecoverySeconds": 3,
+    "servedPercent": 99.83,
+    "recentReserve": 0.003
+  },
+  {
+    "quotaSeconds": 35,
+    "coefficient": 0.02,
+    "strategy": "capacity",
+    "level": 20,
+    "activeSeconds": 637,
+    "cash": 4899,
+    "purchases": 12,
+    "purchaseOpportunities": 125,
+    "maxFundingWaitSeconds": 1,
+    "totalFundingWaitSeconds": 1,
+    "lastThreeReserves": [
+      0.003,
+      0.143,
+      0.004
+    ],
+    "maxRecoverySeconds": 3,
+    "servedPercent": 99.91,
+    "recentReserve": 0.05
+  },
+  {
+    "quotaSeconds": 35,
+    "coefficient": 0.02,
+    "strategy": "capacity",
+    "level": 40,
+    "activeSeconds": 1347,
+    "cash": 23491,
+    "purchases": 16,
+    "purchaseOpportunities": 188,
+    "maxFundingWaitSeconds": 1,
+    "totalFundingWaitSeconds": 1,
+    "lastThreeReserves": [
+      0.136,
+      0.005,
+      0.411
+    ],
+    "maxRecoverySeconds": 3,
+    "servedPercent": 99.91,
+    "recentReserve": 0.184
+  },
+  {
+    "quotaSeconds": 35,
+    "coefficient": 0.02,
+    "strategy": "capacity",
+    "level": 100,
+    "activeSeconds": 3410,
+    "cash": 243731,
+    "purchases": 18,
+    "purchaseOpportunities": 190,
+    "maxFundingWaitSeconds": 1,
+    "totalFundingWaitSeconds": 1,
+    "lastThreeReserves": [
+      0.411,
+      0.455,
+      0.811
+    ],
+    "maxRecoverySeconds": 3,
+    "servedPercent": 99.97,
+    "recentReserve": 0.559
+  },
+  {
+    "quotaSeconds": 35,
+    "coefficient": 0.02,
+    "strategy": "capacity",
+    "level": 1000,
+    "activeSeconds": 33675,
+    "cash": 23388924,
+    "purchases": 141,
+    "purchaseOpportunities": 313,
+    "maxFundingWaitSeconds": 1,
+    "totalFundingWaitSeconds": 1,
+    "lastThreeReserves": [
+      0.947,
+      0.947,
+      0.947
+    ],
+    "maxRecoverySeconds": 12,
+    "servedPercent": 99.92,
+    "recentReserve": 0.947
+  },
+  {
+    "quotaSeconds": 35,
+    "coefficient": 0.02,
+    "strategy": "cache",
+    "level": 5,
+    "activeSeconds": 180,
+    "cash": 1047,
+    "purchases": 6,
+    "purchaseOpportunities": 27,
+    "maxFundingWaitSeconds": 1,
+    "totalFundingWaitSeconds": 1,
+    "lastThreeReserves": [
+      0.3,
+      0.031,
+      0.026
+    ],
+    "maxRecoverySeconds": 3,
+    "servedPercent": 99.64,
+    "recentReserve": 0.119
+  },
+  {
+    "quotaSeconds": 35,
+    "coefficient": 0.02,
+    "strategy": "cache",
+    "level": 10,
+    "activeSeconds": 344,
+    "cash": 101,
+    "purchases": 10,
+    "purchaseOpportunities": 63,
+    "maxFundingWaitSeconds": 1,
+    "totalFundingWaitSeconds": 1,
+    "lastThreeReserves": [
+      0.007,
+      0.001,
+      0.003
+    ],
+    "maxRecoverySeconds": 3,
+    "servedPercent": 99.83,
+    "recentReserve": 0.003
+  },
+  {
+    "quotaSeconds": 35,
+    "coefficient": 0.02,
+    "strategy": "cache",
+    "level": 20,
+    "activeSeconds": 637,
+    "cash": 4899,
+    "purchases": 12,
+    "purchaseOpportunities": 125,
+    "maxFundingWaitSeconds": 1,
+    "totalFundingWaitSeconds": 1,
+    "lastThreeReserves": [
+      0.003,
+      0.143,
+      0.004
+    ],
+    "maxRecoverySeconds": 3,
+    "servedPercent": 99.91,
+    "recentReserve": 0.05
+  },
+  {
+    "quotaSeconds": 35,
+    "coefficient": 0.02,
+    "strategy": "cache",
+    "level": 40,
+    "activeSeconds": 1348,
+    "cash": 20441,
+    "purchases": 15,
+    "purchaseOpportunities": 198,
+    "maxFundingWaitSeconds": 1,
+    "totalFundingWaitSeconds": 1,
+    "lastThreeReserves": [
+      0.001,
+      0.041,
+      0.014
+    ],
+    "maxRecoverySeconds": 3,
+    "servedPercent": 99.94,
+    "recentReserve": 0.019
+  },
+  {
+    "quotaSeconds": 35,
+    "coefficient": 0.02,
+    "strategy": "cache",
+    "level": 100,
+    "activeSeconds": 3410,
+    "cash": 235608,
+    "purchases": 17,
+    "purchaseOpportunities": 200,
+    "maxFundingWaitSeconds": 1,
+    "totalFundingWaitSeconds": 1,
+    "lastThreeReserves": [
+      0.014,
+      0.406,
+      0.784
+    ],
+    "maxRecoverySeconds": 3,
+    "servedPercent": 99.98,
+    "recentReserve": 0.401
+  },
+  {
+    "quotaSeconds": 35,
+    "coefficient": 0.02,
+    "strategy": "cache",
+    "level": 1000,
+    "activeSeconds": 33664,
+    "cash": 22437305,
+    "purchases": 127,
+    "purchaseOpportunities": 310,
+    "maxFundingWaitSeconds": 1,
+    "totalFundingWaitSeconds": 1,
+    "lastThreeReserves": [
+      0.909,
+      0.909,
+      0.908
+    ],
+    "maxRecoverySeconds": 12,
+    "servedPercent": 99.93,
+    "recentReserve": 0.909
+  },
+  {
+    "quotaSeconds": 35,
+    "coefficient": 0.04,
+    "strategy": "capacity",
+    "level": 5,
+    "activeSeconds": 180,
+    "cash": 1047,
+    "purchases": 6,
+    "purchaseOpportunities": 27,
+    "maxFundingWaitSeconds": 1,
+    "totalFundingWaitSeconds": 1,
+    "lastThreeReserves": [
+      0.3,
+      0.031,
+      0.026
+    ],
+    "maxRecoverySeconds": 3,
+    "servedPercent": 99.64,
+    "recentReserve": 0.119
+  },
+  {
+    "quotaSeconds": 35,
+    "coefficient": 0.04,
+    "strategy": "capacity",
+    "level": 10,
+    "activeSeconds": 344,
+    "cash": 101,
+    "purchases": 10,
+    "purchaseOpportunities": 63,
+    "maxFundingWaitSeconds": 1,
+    "totalFundingWaitSeconds": 1,
+    "lastThreeReserves": [
+      0.007,
+      0.001,
+      0.003
+    ],
+    "maxRecoverySeconds": 3,
+    "servedPercent": 99.83,
+    "recentReserve": 0.003
+  },
+  {
+    "quotaSeconds": 35,
+    "coefficient": 0.04,
+    "strategy": "capacity",
+    "level": 20,
+    "activeSeconds": 637,
+    "cash": 4899,
+    "purchases": 12,
+    "purchaseOpportunities": 125,
+    "maxFundingWaitSeconds": 1,
+    "totalFundingWaitSeconds": 1,
+    "lastThreeReserves": [
+      0.003,
+      0.143,
+      0.004
+    ],
+    "maxRecoverySeconds": 3,
+    "servedPercent": 99.91,
+    "recentReserve": 0.05
+  },
+  {
+    "quotaSeconds": 35,
+    "coefficient": 0.04,
+    "strategy": "capacity",
+    "level": 40,
+    "activeSeconds": 1347,
+    "cash": 23491,
+    "purchases": 16,
+    "purchaseOpportunities": 188,
+    "maxFundingWaitSeconds": 1,
+    "totalFundingWaitSeconds": 1,
+    "lastThreeReserves": [
+      0.136,
+      0.005,
+      0.411
+    ],
+    "maxRecoverySeconds": 3,
+    "servedPercent": 99.91,
+    "recentReserve": 0.184
+  },
+  {
+    "quotaSeconds": 35,
+    "coefficient": 0.04,
+    "strategy": "capacity",
+    "level": 100,
+    "activeSeconds": 3410,
+    "cash": 243731,
+    "purchases": 18,
+    "purchaseOpportunities": 190,
+    "maxFundingWaitSeconds": 1,
+    "totalFundingWaitSeconds": 1,
+    "lastThreeReserves": [
+      0.411,
+      0.455,
+      0.811
+    ],
+    "maxRecoverySeconds": 3,
+    "servedPercent": 99.97,
+    "recentReserve": 0.559
+  },
+  {
+    "quotaSeconds": 35,
+    "coefficient": 0.04,
+    "strategy": "capacity",
+    "level": 1000,
+    "activeSeconds": 33675,
+    "cash": 23250266,
+    "purchases": 141,
+    "purchaseOpportunities": 313,
+    "maxFundingWaitSeconds": 1,
+    "totalFundingWaitSeconds": 1,
+    "lastThreeReserves": [
+      0.942,
+      0.941,
+      0.941
+    ],
+    "maxRecoverySeconds": 12,
+    "servedPercent": 99.92,
+    "recentReserve": 0.941
+  },
+  {
+    "quotaSeconds": 35,
+    "coefficient": 0.04,
+    "strategy": "cache",
+    "level": 5,
+    "activeSeconds": 180,
+    "cash": 1047,
+    "purchases": 6,
+    "purchaseOpportunities": 27,
+    "maxFundingWaitSeconds": 1,
+    "totalFundingWaitSeconds": 1,
+    "lastThreeReserves": [
+      0.3,
+      0.031,
+      0.026
+    ],
+    "maxRecoverySeconds": 3,
+    "servedPercent": 99.64,
+    "recentReserve": 0.119
+  },
+  {
+    "quotaSeconds": 35,
+    "coefficient": 0.04,
+    "strategy": "cache",
+    "level": 10,
+    "activeSeconds": 344,
+    "cash": 101,
+    "purchases": 10,
+    "purchaseOpportunities": 63,
+    "maxFundingWaitSeconds": 1,
+    "totalFundingWaitSeconds": 1,
+    "lastThreeReserves": [
+      0.007,
+      0.001,
+      0.003
+    ],
+    "maxRecoverySeconds": 3,
+    "servedPercent": 99.83,
+    "recentReserve": 0.003
+  },
+  {
+    "quotaSeconds": 35,
+    "coefficient": 0.04,
+    "strategy": "cache",
+    "level": 20,
+    "activeSeconds": 637,
+    "cash": 4899,
+    "purchases": 12,
+    "purchaseOpportunities": 125,
+    "maxFundingWaitSeconds": 1,
+    "totalFundingWaitSeconds": 1,
+    "lastThreeReserves": [
+      0.003,
+      0.143,
+      0.004
+    ],
+    "maxRecoverySeconds": 3,
+    "servedPercent": 99.91,
+    "recentReserve": 0.05
+  },
+  {
+    "quotaSeconds": 35,
+    "coefficient": 0.04,
+    "strategy": "cache",
+    "level": 40,
+    "activeSeconds": 1348,
+    "cash": 20441,
+    "purchases": 15,
+    "purchaseOpportunities": 198,
+    "maxFundingWaitSeconds": 1,
+    "totalFundingWaitSeconds": 1,
+    "lastThreeReserves": [
+      0.001,
+      0.041,
+      0.014
+    ],
+    "maxRecoverySeconds": 3,
+    "servedPercent": 99.94,
+    "recentReserve": 0.019
+  },
+  {
+    "quotaSeconds": 35,
+    "coefficient": 0.04,
+    "strategy": "cache",
+    "level": 100,
+    "activeSeconds": 3410,
+    "cash": 235608,
+    "purchases": 17,
+    "purchaseOpportunities": 200,
+    "maxFundingWaitSeconds": 1,
+    "totalFundingWaitSeconds": 1,
+    "lastThreeReserves": [
+      0.014,
+      0.406,
+      0.784
+    ],
+    "maxRecoverySeconds": 3,
+    "servedPercent": 99.98,
+    "recentReserve": 0.401
+  },
+  {
+    "quotaSeconds": 35,
+    "coefficient": 0.04,
+    "strategy": "cache",
+    "level": 1000,
+    "activeSeconds": 33664,
+    "cash": 22313755,
+    "purchases": 127,
+    "purchaseOpportunities": 310,
+    "maxFundingWaitSeconds": 1,
+    "totalFundingWaitSeconds": 1,
+    "lastThreeReserves": [
+      0.904,
+      0.904,
+      0.903
+    ],
+    "maxRecoverySeconds": 12,
+    "servedPercent": 99.93,
+    "recentReserve": 0.904
+  },
+  {
+    "quotaSeconds": 35,
+    "coefficient": 0.06,
+    "strategy": "capacity",
+    "level": 5,
+    "activeSeconds": 180,
+    "cash": 1047,
+    "purchases": 6,
+    "purchaseOpportunities": 27,
+    "maxFundingWaitSeconds": 1,
+    "totalFundingWaitSeconds": 1,
+    "lastThreeReserves": [
+      0.3,
+      0.031,
+      0.026
+    ],
+    "maxRecoverySeconds": 3,
+    "servedPercent": 99.64,
+    "recentReserve": 0.119
+  },
+  {
+    "quotaSeconds": 35,
+    "coefficient": 0.06,
+    "strategy": "capacity",
+    "level": 10,
+    "activeSeconds": 344,
+    "cash": 101,
+    "purchases": 10,
+    "purchaseOpportunities": 63,
+    "maxFundingWaitSeconds": 1,
+    "totalFundingWaitSeconds": 1,
+    "lastThreeReserves": [
+      0.007,
+      0.001,
+      0.003
+    ],
+    "maxRecoverySeconds": 3,
+    "servedPercent": 99.83,
+    "recentReserve": 0.003
+  },
+  {
+    "quotaSeconds": 35,
+    "coefficient": 0.06,
+    "strategy": "capacity",
+    "level": 20,
+    "activeSeconds": 637,
+    "cash": 4899,
+    "purchases": 12,
+    "purchaseOpportunities": 125,
+    "maxFundingWaitSeconds": 1,
+    "totalFundingWaitSeconds": 1,
+    "lastThreeReserves": [
+      0.003,
+      0.143,
+      0.004
+    ],
+    "maxRecoverySeconds": 3,
+    "servedPercent": 99.91,
+    "recentReserve": 0.05
+  },
+  {
+    "quotaSeconds": 35,
+    "coefficient": 0.06,
+    "strategy": "capacity",
+    "level": 40,
+    "activeSeconds": 1347,
+    "cash": 23491,
+    "purchases": 16,
+    "purchaseOpportunities": 188,
+    "maxFundingWaitSeconds": 1,
+    "totalFundingWaitSeconds": 1,
+    "lastThreeReserves": [
+      0.136,
+      0.005,
+      0.411
+    ],
+    "maxRecoverySeconds": 3,
+    "servedPercent": 99.91,
+    "recentReserve": 0.184
+  },
+  {
+    "quotaSeconds": 35,
+    "coefficient": 0.06,
+    "strategy": "capacity",
+    "level": 100,
+    "activeSeconds": 3410,
+    "cash": 243731,
+    "purchases": 18,
+    "purchaseOpportunities": 190,
+    "maxFundingWaitSeconds": 1,
+    "totalFundingWaitSeconds": 1,
+    "lastThreeReserves": [
+      0.411,
+      0.455,
+      0.811
+    ],
+    "maxRecoverySeconds": 3,
+    "servedPercent": 99.97,
+    "recentReserve": 0.559
+  },
+  {
+    "quotaSeconds": 35,
+    "coefficient": 0.06,
+    "strategy": "capacity",
+    "level": 1000,
+    "activeSeconds": 33675,
+    "cash": 23111618,
+    "purchases": 141,
+    "purchaseOpportunities": 313,
+    "maxFundingWaitSeconds": 1,
+    "totalFundingWaitSeconds": 1,
+    "lastThreeReserves": [
+      0.936,
+      0.936,
+      0.936
+    ],
+    "maxRecoverySeconds": 12,
+    "servedPercent": 99.92,
+    "recentReserve": 0.936
+  },
+  {
+    "quotaSeconds": 35,
+    "coefficient": 0.06,
+    "strategy": "cache",
+    "level": 5,
+    "activeSeconds": 180,
+    "cash": 1047,
+    "purchases": 6,
+    "purchaseOpportunities": 27,
+    "maxFundingWaitSeconds": 1,
+    "totalFundingWaitSeconds": 1,
+    "lastThreeReserves": [
+      0.3,
+      0.031,
+      0.026
+    ],
+    "maxRecoverySeconds": 3,
+    "servedPercent": 99.64,
+    "recentReserve": 0.119
+  },
+  {
+    "quotaSeconds": 35,
+    "coefficient": 0.06,
+    "strategy": "cache",
+    "level": 10,
+    "activeSeconds": 344,
+    "cash": 101,
+    "purchases": 10,
+    "purchaseOpportunities": 63,
+    "maxFundingWaitSeconds": 1,
+    "totalFundingWaitSeconds": 1,
+    "lastThreeReserves": [
+      0.007,
+      0.001,
+      0.003
+    ],
+    "maxRecoverySeconds": 3,
+    "servedPercent": 99.83,
+    "recentReserve": 0.003
+  },
+  {
+    "quotaSeconds": 35,
+    "coefficient": 0.06,
+    "strategy": "cache",
+    "level": 20,
+    "activeSeconds": 637,
+    "cash": 4899,
+    "purchases": 12,
+    "purchaseOpportunities": 125,
+    "maxFundingWaitSeconds": 1,
+    "totalFundingWaitSeconds": 1,
+    "lastThreeReserves": [
+      0.003,
+      0.143,
+      0.004
+    ],
+    "maxRecoverySeconds": 3,
+    "servedPercent": 99.91,
+    "recentReserve": 0.05
+  },
+  {
+    "quotaSeconds": 35,
+    "coefficient": 0.06,
+    "strategy": "cache",
+    "level": 40,
+    "activeSeconds": 1348,
+    "cash": 20441,
+    "purchases": 15,
+    "purchaseOpportunities": 198,
+    "maxFundingWaitSeconds": 1,
+    "totalFundingWaitSeconds": 1,
+    "lastThreeReserves": [
+      0.001,
+      0.041,
+      0.014
+    ],
+    "maxRecoverySeconds": 3,
+    "servedPercent": 99.94,
+    "recentReserve": 0.019
+  },
+  {
+    "quotaSeconds": 35,
+    "coefficient": 0.06,
+    "strategy": "cache",
+    "level": 100,
+    "activeSeconds": 3410,
+    "cash": 235608,
+    "purchases": 17,
+    "purchaseOpportunities": 200,
+    "maxFundingWaitSeconds": 1,
+    "totalFundingWaitSeconds": 1,
+    "lastThreeReserves": [
+      0.014,
+      0.406,
+      0.784
+    ],
+    "maxRecoverySeconds": 3,
+    "servedPercent": 99.98,
+    "recentReserve": 0.401
+  },
+  {
+    "quotaSeconds": 35,
+    "coefficient": 0.06,
+    "strategy": "cache",
+    "level": 1000,
+    "activeSeconds": 33664,
+    "cash": 22190215,
+    "purchases": 127,
+    "purchaseOpportunities": 310,
+    "maxFundingWaitSeconds": 1,
+    "totalFundingWaitSeconds": 1,
+    "lastThreeReserves": [
+      0.899,
+      0.899,
+      0.898
+    ],
+    "maxRecoverySeconds": 12,
+    "servedPercent": 99.93,
+    "recentReserve": 0.899
+  },
+  {
+    "quotaSeconds": 45,
+    "coefficient": 0.02,
+    "strategy": "capacity",
+    "level": 5,
+    "activeSeconds": 228,
+    "cash": 1624,
+    "purchases": 6,
+    "purchaseOpportunities": 32,
+    "maxFundingWaitSeconds": 1,
+    "totalFundingWaitSeconds": 1,
+    "lastThreeReserves": [
+      0.39,
+      0.017,
+      0
+    ],
+    "maxRecoverySeconds": 3,
+    "servedPercent": 99.68,
+    "recentReserve": 0.136
+  },
+  {
+    "quotaSeconds": 45,
+    "coefficient": 0.02,
+    "strategy": "capacity",
+    "level": 10,
+    "activeSeconds": 445,
+    "cash": 1398,
+    "purchases": 10,
+    "purchaseOpportunities": 77,
+    "maxFundingWaitSeconds": 1,
+    "totalFundingWaitSeconds": 1,
+    "lastThreeReserves": [
+      0.07,
+      0.059,
+      0.006
+    ],
+    "maxRecoverySeconds": 3,
+    "servedPercent": 99.85,
+    "recentReserve": 0.045
+  },
+  {
+    "quotaSeconds": 45,
+    "coefficient": 0.02,
+    "strategy": "capacity",
+    "level": 20,
+    "activeSeconds": 845,
+    "cash": 2383,
+    "purchases": 13,
+    "purchaseOpportunities": 159,
+    "maxFundingWaitSeconds": 1,
+    "totalFundingWaitSeconds": 1,
+    "lastThreeReserves": [
+      0.006,
+      0.124,
+      0.003
+    ],
+    "maxRecoverySeconds": 3,
+    "servedPercent": 99.91,
+    "recentReserve": 0.044
+  },
+  {
+    "quotaSeconds": 45,
+    "coefficient": 0.02,
+    "strategy": "capacity",
+    "level": 40,
+    "activeSeconds": 1750,
+    "cash": 37484,
+    "purchases": 16,
+    "purchaseOpportunities": 205,
+    "maxFundingWaitSeconds": 1,
+    "totalFundingWaitSeconds": 1,
+    "lastThreeReserves": [
+      0.282,
+      0.001,
+      0.52
+    ],
+    "maxRecoverySeconds": 3,
+    "servedPercent": 99.92,
+    "recentReserve": 0.268
+  },
+  {
+    "quotaSeconds": 45,
+    "coefficient": 0.02,
+    "strategy": "capacity",
+    "level": 100,
+    "activeSeconds": 4413,
+    "cash": 318420,
+    "purchases": 18,
+    "purchaseOpportunities": 207,
+    "maxFundingWaitSeconds": 1,
+    "totalFundingWaitSeconds": 1,
+    "lastThreeReserves": [
+      0.52,
+      0.554,
+      0.835
+    ],
+    "maxRecoverySeconds": 3,
+    "servedPercent": 99.98,
+    "recentReserve": 0.636
+  },
+  {
+    "quotaSeconds": 45,
+    "coefficient": 0.02,
+    "strategy": "capacity",
+    "level": 1000,
+    "activeSeconds": 43669,
+    "cash": 29797511,
+    "purchases": 141,
+    "purchaseOpportunities": 330,
+    "maxFundingWaitSeconds": 1,
+    "totalFundingWaitSeconds": 1,
+    "lastThreeReserves": [
+      0.95,
+      0.95,
+      0.95
+    ],
+    "maxRecoverySeconds": 12,
+    "servedPercent": 99.93,
+    "recentReserve": 0.95
+  },
+  {
+    "quotaSeconds": 45,
+    "coefficient": 0.02,
+    "strategy": "cache",
+    "level": 5,
+    "activeSeconds": 228,
+    "cash": 1624,
+    "purchases": 6,
+    "purchaseOpportunities": 32,
+    "maxFundingWaitSeconds": 1,
+    "totalFundingWaitSeconds": 1,
+    "lastThreeReserves": [
+      0.39,
+      0.017,
+      0
+    ],
+    "maxRecoverySeconds": 3,
+    "servedPercent": 99.68,
+    "recentReserve": 0.136
+  },
+  {
+    "quotaSeconds": 45,
+    "coefficient": 0.02,
+    "strategy": "cache",
+    "level": 10,
+    "activeSeconds": 445,
+    "cash": 1398,
+    "purchases": 10,
+    "purchaseOpportunities": 77,
+    "maxFundingWaitSeconds": 1,
+    "totalFundingWaitSeconds": 1,
+    "lastThreeReserves": [
+      0.07,
+      0.059,
+      0.006
+    ],
+    "maxRecoverySeconds": 3,
+    "servedPercent": 99.85,
+    "recentReserve": 0.045
+  },
+  {
+    "quotaSeconds": 45,
+    "coefficient": 0.02,
+    "strategy": "cache",
+    "level": 20,
+    "activeSeconds": 845,
+    "cash": 2383,
+    "purchases": 13,
+    "purchaseOpportunities": 159,
+    "maxFundingWaitSeconds": 1,
+    "totalFundingWaitSeconds": 1,
+    "lastThreeReserves": [
+      0.006,
+      0.124,
+      0.003
+    ],
+    "maxRecoverySeconds": 3,
+    "servedPercent": 99.91,
+    "recentReserve": 0.044
+  },
+  {
+    "quotaSeconds": 45,
+    "coefficient": 0.02,
+    "strategy": "cache",
+    "level": 40,
+    "activeSeconds": 1751,
+    "cash": 34068,
+    "purchases": 15,
+    "purchaseOpportunities": 215,
+    "maxFundingWaitSeconds": 1,
+    "totalFundingWaitSeconds": 1,
+    "lastThreeReserves": [
+      0.003,
+      0.206,
+      0.004
+    ],
+    "maxRecoverySeconds": 3,
+    "servedPercent": 99.94,
+    "recentReserve": 0.071
+  },
+  {
+    "quotaSeconds": 45,
+    "coefficient": 0.02,
+    "strategy": "cache",
+    "level": 100,
+    "activeSeconds": 4414,
+    "cash": 308582,
+    "purchases": 17,
+    "purchaseOpportunities": 217,
+    "maxFundingWaitSeconds": 1,
+    "totalFundingWaitSeconds": 1,
+    "lastThreeReserves": [
+      0.004,
+      0.513,
+      0.81
+    ],
+    "maxRecoverySeconds": 3,
+    "servedPercent": 99.98,
+    "recentReserve": 0.442
+  },
+  {
+    "quotaSeconds": 45,
+    "coefficient": 0.02,
+    "strategy": "cache",
+    "level": 1000,
+    "activeSeconds": 43661,
+    "cash": 28586809,
+    "purchases": 126,
+    "purchaseOpportunities": 326,
+    "maxFundingWaitSeconds": 1,
+    "totalFundingWaitSeconds": 1,
+    "lastThreeReserves": [
+      0.911,
+      0.911,
+      0.911
+    ],
+    "maxRecoverySeconds": 12,
+    "servedPercent": 99.95,
+    "recentReserve": 0.911
+  },
+  {
+    "quotaSeconds": 45,
+    "coefficient": 0.04,
+    "strategy": "capacity",
+    "level": 5,
+    "activeSeconds": 228,
+    "cash": 1624,
+    "purchases": 6,
+    "purchaseOpportunities": 32,
+    "maxFundingWaitSeconds": 1,
+    "totalFundingWaitSeconds": 1,
+    "lastThreeReserves": [
+      0.39,
+      0.017,
+      0
+    ],
+    "maxRecoverySeconds": 3,
+    "servedPercent": 99.68,
+    "recentReserve": 0.136
+  },
+  {
+    "quotaSeconds": 45,
+    "coefficient": 0.04,
+    "strategy": "capacity",
+    "level": 10,
+    "activeSeconds": 445,
+    "cash": 1398,
+    "purchases": 10,
+    "purchaseOpportunities": 77,
+    "maxFundingWaitSeconds": 1,
+    "totalFundingWaitSeconds": 1,
+    "lastThreeReserves": [
+      0.07,
+      0.059,
+      0.006
+    ],
+    "maxRecoverySeconds": 3,
+    "servedPercent": 99.85,
+    "recentReserve": 0.045
+  },
+  {
+    "quotaSeconds": 45,
+    "coefficient": 0.04,
+    "strategy": "capacity",
+    "level": 20,
+    "activeSeconds": 845,
+    "cash": 2383,
+    "purchases": 13,
+    "purchaseOpportunities": 159,
+    "maxFundingWaitSeconds": 1,
+    "totalFundingWaitSeconds": 1,
+    "lastThreeReserves": [
+      0.006,
+      0.124,
+      0.003
+    ],
+    "maxRecoverySeconds": 3,
+    "servedPercent": 99.91,
+    "recentReserve": 0.044
+  },
+  {
+    "quotaSeconds": 45,
+    "coefficient": 0.04,
+    "strategy": "capacity",
+    "level": 40,
+    "activeSeconds": 1750,
+    "cash": 37484,
+    "purchases": 16,
+    "purchaseOpportunities": 205,
+    "maxFundingWaitSeconds": 1,
+    "totalFundingWaitSeconds": 1,
+    "lastThreeReserves": [
+      0.282,
+      0.001,
+      0.52
+    ],
+    "maxRecoverySeconds": 3,
+    "servedPercent": 99.92,
+    "recentReserve": 0.268
+  },
+  {
+    "quotaSeconds": 45,
+    "coefficient": 0.04,
+    "strategy": "capacity",
+    "level": 100,
+    "activeSeconds": 4413,
+    "cash": 318420,
+    "purchases": 18,
+    "purchaseOpportunities": 207,
+    "maxFundingWaitSeconds": 1,
+    "totalFundingWaitSeconds": 1,
+    "lastThreeReserves": [
+      0.52,
+      0.554,
+      0.835
+    ],
+    "maxRecoverySeconds": 3,
+    "servedPercent": 99.98,
+    "recentReserve": 0.636
+  },
+  {
+    "quotaSeconds": 45,
+    "coefficient": 0.04,
+    "strategy": "capacity",
+    "level": 1000,
+    "activeSeconds": 43669,
+    "cash": 29658853,
+    "purchases": 141,
+    "purchaseOpportunities": 330,
+    "maxFundingWaitSeconds": 1,
+    "totalFundingWaitSeconds": 1,
+    "lastThreeReserves": [
+      0.945,
+      0.945,
+      0.945
+    ],
+    "maxRecoverySeconds": 12,
+    "servedPercent": 99.93,
+    "recentReserve": 0.945
+  },
+  {
+    "quotaSeconds": 45,
+    "coefficient": 0.04,
+    "strategy": "cache",
+    "level": 5,
+    "activeSeconds": 228,
+    "cash": 1624,
+    "purchases": 6,
+    "purchaseOpportunities": 32,
+    "maxFundingWaitSeconds": 1,
+    "totalFundingWaitSeconds": 1,
+    "lastThreeReserves": [
+      0.39,
+      0.017,
+      0
+    ],
+    "maxRecoverySeconds": 3,
+    "servedPercent": 99.68,
+    "recentReserve": 0.136
+  },
+  {
+    "quotaSeconds": 45,
+    "coefficient": 0.04,
+    "strategy": "cache",
+    "level": 10,
+    "activeSeconds": 445,
+    "cash": 1398,
+    "purchases": 10,
+    "purchaseOpportunities": 77,
+    "maxFundingWaitSeconds": 1,
+    "totalFundingWaitSeconds": 1,
+    "lastThreeReserves": [
+      0.07,
+      0.059,
+      0.006
+    ],
+    "maxRecoverySeconds": 3,
+    "servedPercent": 99.85,
+    "recentReserve": 0.045
+  },
+  {
+    "quotaSeconds": 45,
+    "coefficient": 0.04,
+    "strategy": "cache",
+    "level": 20,
+    "activeSeconds": 845,
+    "cash": 2383,
+    "purchases": 13,
+    "purchaseOpportunities": 159,
+    "maxFundingWaitSeconds": 1,
+    "totalFundingWaitSeconds": 1,
+    "lastThreeReserves": [
+      0.006,
+      0.124,
+      0.003
+    ],
+    "maxRecoverySeconds": 3,
+    "servedPercent": 99.91,
+    "recentReserve": 0.044
+  },
+  {
+    "quotaSeconds": 45,
+    "coefficient": 0.04,
+    "strategy": "cache",
+    "level": 40,
+    "activeSeconds": 1751,
+    "cash": 34068,
+    "purchases": 15,
+    "purchaseOpportunities": 215,
+    "maxFundingWaitSeconds": 1,
+    "totalFundingWaitSeconds": 1,
+    "lastThreeReserves": [
+      0.003,
+      0.206,
+      0.004
+    ],
+    "maxRecoverySeconds": 3,
+    "servedPercent": 99.94,
+    "recentReserve": 0.071
+  },
+  {
+    "quotaSeconds": 45,
+    "coefficient": 0.04,
+    "strategy": "cache",
+    "level": 100,
+    "activeSeconds": 4414,
+    "cash": 308582,
+    "purchases": 17,
+    "purchaseOpportunities": 217,
+    "maxFundingWaitSeconds": 1,
+    "totalFundingWaitSeconds": 1,
+    "lastThreeReserves": [
+      0.004,
+      0.513,
+      0.81
+    ],
+    "maxRecoverySeconds": 3,
+    "servedPercent": 99.98,
+    "recentReserve": 0.442
+  },
+  {
+    "quotaSeconds": 45,
+    "coefficient": 0.04,
+    "strategy": "cache",
+    "level": 1000,
+    "activeSeconds": 43661,
+    "cash": 28465683,
+    "purchases": 126,
+    "purchaseOpportunities": 326,
+    "maxFundingWaitSeconds": 1,
+    "totalFundingWaitSeconds": 1,
+    "lastThreeReserves": [
+      0.908,
+      0.907,
+      0.907
+    ],
+    "maxRecoverySeconds": 12,
+    "servedPercent": 99.95,
+    "recentReserve": 0.907
+  },
+  {
+    "quotaSeconds": 45,
+    "coefficient": 0.06,
+    "strategy": "capacity",
+    "level": 5,
+    "activeSeconds": 228,
+    "cash": 1624,
+    "purchases": 6,
+    "purchaseOpportunities": 32,
+    "maxFundingWaitSeconds": 1,
+    "totalFundingWaitSeconds": 1,
+    "lastThreeReserves": [
+      0.39,
+      0.017,
+      0
+    ],
+    "maxRecoverySeconds": 3,
+    "servedPercent": 99.68,
+    "recentReserve": 0.136
+  },
+  {
+    "quotaSeconds": 45,
+    "coefficient": 0.06,
+    "strategy": "capacity",
+    "level": 10,
+    "activeSeconds": 445,
+    "cash": 1398,
+    "purchases": 10,
+    "purchaseOpportunities": 77,
+    "maxFundingWaitSeconds": 1,
+    "totalFundingWaitSeconds": 1,
+    "lastThreeReserves": [
+      0.07,
+      0.059,
+      0.006
+    ],
+    "maxRecoverySeconds": 3,
+    "servedPercent": 99.85,
+    "recentReserve": 0.045
+  },
+  {
+    "quotaSeconds": 45,
+    "coefficient": 0.06,
+    "strategy": "capacity",
+    "level": 20,
+    "activeSeconds": 845,
+    "cash": 2383,
+    "purchases": 13,
+    "purchaseOpportunities": 159,
+    "maxFundingWaitSeconds": 1,
+    "totalFundingWaitSeconds": 1,
+    "lastThreeReserves": [
+      0.006,
+      0.124,
+      0.003
+    ],
+    "maxRecoverySeconds": 3,
+    "servedPercent": 99.91,
+    "recentReserve": 0.044
+  },
+  {
+    "quotaSeconds": 45,
+    "coefficient": 0.06,
+    "strategy": "capacity",
+    "level": 40,
+    "activeSeconds": 1750,
+    "cash": 37484,
+    "purchases": 16,
+    "purchaseOpportunities": 205,
+    "maxFundingWaitSeconds": 1,
+    "totalFundingWaitSeconds": 1,
+    "lastThreeReserves": [
+      0.282,
+      0.001,
+      0.52
+    ],
+    "maxRecoverySeconds": 3,
+    "servedPercent": 99.92,
+    "recentReserve": 0.268
+  },
+  {
+    "quotaSeconds": 45,
+    "coefficient": 0.06,
+    "strategy": "capacity",
+    "level": 100,
+    "activeSeconds": 4413,
+    "cash": 318420,
+    "purchases": 18,
+    "purchaseOpportunities": 207,
+    "maxFundingWaitSeconds": 1,
+    "totalFundingWaitSeconds": 1,
+    "lastThreeReserves": [
+      0.52,
+      0.554,
+      0.835
+    ],
+    "maxRecoverySeconds": 3,
+    "servedPercent": 99.98,
+    "recentReserve": 0.636
+  },
+  {
+    "quotaSeconds": 45,
+    "coefficient": 0.06,
+    "strategy": "capacity",
+    "level": 1000,
+    "activeSeconds": 43669,
+    "cash": 29520205,
+    "purchases": 141,
+    "purchaseOpportunities": 330,
+    "maxFundingWaitSeconds": 1,
+    "totalFundingWaitSeconds": 1,
+    "lastThreeReserves": [
+      0.941,
+      0.941,
+      0.941
+    ],
+    "maxRecoverySeconds": 12,
+    "servedPercent": 99.93,
+    "recentReserve": 0.941
+  },
+  {
+    "quotaSeconds": 45,
+    "coefficient": 0.06,
+    "strategy": "cache",
+    "level": 5,
+    "activeSeconds": 228,
+    "cash": 1624,
+    "purchases": 6,
+    "purchaseOpportunities": 32,
+    "maxFundingWaitSeconds": 1,
+    "totalFundingWaitSeconds": 1,
+    "lastThreeReserves": [
+      0.39,
+      0.017,
+      0
+    ],
+    "maxRecoverySeconds": 3,
+    "servedPercent": 99.68,
+    "recentReserve": 0.136
+  },
+  {
+    "quotaSeconds": 45,
+    "coefficient": 0.06,
+    "strategy": "cache",
+    "level": 10,
+    "activeSeconds": 445,
+    "cash": 1398,
+    "purchases": 10,
+    "purchaseOpportunities": 77,
+    "maxFundingWaitSeconds": 1,
+    "totalFundingWaitSeconds": 1,
+    "lastThreeReserves": [
+      0.07,
+      0.059,
+      0.006
+    ],
+    "maxRecoverySeconds": 3,
+    "servedPercent": 99.85,
+    "recentReserve": 0.045
+  },
+  {
+    "quotaSeconds": 45,
+    "coefficient": 0.06,
+    "strategy": "cache",
+    "level": 20,
+    "activeSeconds": 845,
+    "cash": 2383,
+    "purchases": 13,
+    "purchaseOpportunities": 159,
+    "maxFundingWaitSeconds": 1,
+    "totalFundingWaitSeconds": 1,
+    "lastThreeReserves": [
+      0.006,
+      0.124,
+      0.003
+    ],
+    "maxRecoverySeconds": 3,
+    "servedPercent": 99.91,
+    "recentReserve": 0.044
+  },
+  {
+    "quotaSeconds": 45,
+    "coefficient": 0.06,
+    "strategy": "cache",
+    "level": 40,
+    "activeSeconds": 1751,
+    "cash": 34068,
+    "purchases": 15,
+    "purchaseOpportunities": 215,
+    "maxFundingWaitSeconds": 1,
+    "totalFundingWaitSeconds": 1,
+    "lastThreeReserves": [
+      0.003,
+      0.206,
+      0.004
+    ],
+    "maxRecoverySeconds": 3,
+    "servedPercent": 99.94,
+    "recentReserve": 0.071
+  },
+  {
+    "quotaSeconds": 45,
+    "coefficient": 0.06,
+    "strategy": "cache",
+    "level": 100,
+    "activeSeconds": 4414,
+    "cash": 308582,
+    "purchases": 17,
+    "purchaseOpportunities": 217,
+    "maxFundingWaitSeconds": 1,
+    "totalFundingWaitSeconds": 1,
+    "lastThreeReserves": [
+      0.004,
+      0.513,
+      0.81
+    ],
+    "maxRecoverySeconds": 3,
+    "servedPercent": 99.98,
+    "recentReserve": 0.442
+  },
+  {
+    "quotaSeconds": 45,
+    "coefficient": 0.06,
+    "strategy": "cache",
+    "level": 1000,
+    "activeSeconds": 43661,
+    "cash": 28344567,
+    "purchases": 126,
+    "purchaseOpportunities": 326,
+    "maxFundingWaitSeconds": 1,
+    "totalFundingWaitSeconds": 1,
+    "lastThreeReserves": [
+      0.904,
+      0.904,
+      0.903
+    ],
+    "maxRecoverySeconds": 12,
+    "servedPercent": 99.95,
+    "recentReserve": 0.904
+  }
+]

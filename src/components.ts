@@ -4,20 +4,21 @@ import {UPGRADES} from './sim/upgrades'
 export type SceneView='Workshop'|'Server Interior'|'Service Flow'
 export type ComponentInfo={id:string;name:string;brief:string;view:SceneView;focus?:string}
 export const EQUIPMENT_IDS:EquipmentId[]=['cpu','memory','ssd','network','cloud','ai']
+export const componentName=(id:string,state:GameState)=>id==='ssd'?`Storage (${state.equipmentLevels.ssd===0?'HDD':'SSD'})`:COMPONENTS[id]?.name??id
 export const COMPONENTS:Record<string,ComponentInfo>={
  autoscaling:{id:'autoscaling',name:'Autoscaling',brief:'Matches rented capacity to admitted traffic.',view:'Service Flow'},
  cpu:{id:'cpu',name:'CPU',brief:'Processes the work behind customer requests.',view:'Server Interior'},
  memory:{id:'memory',name:'Memory',brief:'Keeps active work ready while the server processes it.',view:'Server Interior'},
  ssd:{id:'ssd',name:'Storage (SSD)',brief:'Stores customer data and supplies it when requests need it.',view:'Server Interior'},
  network:{id:'network',name:'Network',brief:'Connects your servers to customers. More bandwidth carries more traffic.',view:'Server Interior'},
- cloud:{id:'cloud',name:'Cloud capacity',brief:'Rents extra application servers when your own machines need help.',view:'Service Flow'},
- ai:{id:'ai',name:'AI capacity',brief:'Rents GPUs to run your AI service.',view:'Service Flow'},
+ cloud:{id:'cloud',name:'Cloud capacity',brief:'Rents application servers.',view:'Service Flow'},
+ ai:{id:'ai',name:'AI capacity',brief:'Rents GPUs for AI requests.',view:'Service Flow'},
  virtualization:{id:'virtualization',name:'Virtualization',brief:'Runs isolated virtual machines on your existing hardware.',view:'Server Interior',focus:'motherboard'},
  server2:{id:'server2',name:'Second Server',brief:'Adds another physical machine to share the work.',view:'Workshop'},
  load_balancer:{id:'load_balancer',name:'Load Balancer',brief:'Sends requests to healthy servers and spreads the workload.',view:'Service Flow'},
  backup:{id:'backup',name:'Backup & Recovery',brief:'Keeps recovery copies so you can restore service sooner.',view:'Workshop'},
  security:{id:'security',name:'Firewall & IAM',brief:'Filters unwanted traffic and controls access to your systems.',view:'Workshop'},
- cache:{id:'cache',name:'Edge Cache',brief:'Answers repeated reads without asking your servers to do the work again.',view:'Service Flow'},
+ cache:{id:'cache',name:'Application Cache',brief:'Answers eligible reads behind your uplink without repeating origin work.',view:'Service Flow'},
  motherboard:{id:'motherboard',name:'Motherboard',brief:'Connects the processor, memory, drives, and network card.',view:'Server Interior'},
  power:{id:'power',name:'Power supply',brief:'Supplies electricity to the server’s components.',view:'Server Interior'},
  cooling:{id:'cooling',name:'Cooling',brief:'Carries heat away so the hardware can run reliably.',view:'Server Interior'},
@@ -44,7 +45,8 @@ export function componentStats(id:string,h:Hardware):[string,string][]{
 export function learnPages(id:string,s:GameState):string[]{
  const text=EQUIPMENT_IDS.includes(id as EquipmentId)?getHardwareExplanation(id,s):UPGRADES.find(u=>u.id===id)?.lesson??COMPONENTS[id]?.brief??'Select a component to learn what it does.'
  const pages:string[]=[];let page=''
- for(const word of text.split(' ')){if((page+' '+word).length>230){pages.push(page);page=word}else page+=(page?' ':'')+word}if(page)pages.push(page)
+ const assumptions=' These are teaching estimates, not hardware benchmarks. Per-core scheduling, queue backlog, power draw, and percentile latency are not modeled. Estimated response time is a simplified pressure indicator, not a measured delay.'
+ for(const word of (text+assumptions).split(' ')){if((page+' '+word).length>230){pages.push(page);page=word}else page+=(page?' ':'')+word}if(page)pages.push(page)
  return pages
 }
 export function prerequisiteName(id:UpgradeId){return COMPONENTS[id]?.name??id}

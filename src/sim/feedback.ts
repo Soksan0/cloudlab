@@ -1,4 +1,9 @@
-import type { EquipmentId, EventStatistics, LossStage, Metrics, PurchaseImpact, UpgradeId } from './types'
+import type { EquipmentId, EventStatistics, LossStage, Metrics, PurchaseImpact, UpgradeId,GameState,IncidentKind } from './types'
+export function eventFacts(kind:IncidentKind,s:GameState){
+ const has=(id:UpgradeId)=>s.upgrades.includes(id),surge=s.companyLevel<10?1.3:1.5,available=has('load_balancer')?s.fleet.servers:1,affected=Math.max(1,Math.ceil(available*.25))
+ return {surge,billing:1.5,affected,duration:kind==='hardware'?(has('backup')?60:90):kind==='bot'&&has('security')?60:75,
+ detail:kind==='marketing'?`Customer demand is ${Math.round((surge-1)*100)}% higher. More capacity or Application Cache can help.`:kind==='hardware'?`${affected} physical server${affected===1?' is':'s are'} unavailable. Reserved failover headroom can preserve service. Backups configured before a fault shorten replacement-host restoration.`:kind==='bot'?'Bots consume gateway capacity. Filtering reduces their impact; Strict uses more CPU.':'Cloud capacity and usage cost 50% more. Stop unused rentals or use Economy scaling.'}
+}
 
 export const STAGES: LossStage[] = ['network','compute','memory','storage','ai']
 export const EQUIPMENT_UNITS: Record<EquipmentId,string> = {
@@ -18,10 +23,10 @@ export const TECHNOLOGY_TIPS: Record<string,string> = {
   ai:'Works well with: autoscaling. AI requests need their own GPU capacity.',
 }
 export const EVENT_STORIES = {
-  marketing:{title:'Your campaign went viral!',body:'A midnight product clip hit the city feeds. Customer demand is 50% higher.',tip:'Use network headroom, compute, and caching to catch the surge.'},
+  marketing:{title:'Your campaign went viral!',body:'A promotion is sending more visitors.',tip:'Use network headroom, compute, and caching to catch the surge.'},
   hardware:{title:'A rack went dark.',body:'A failing power module has degraded your on-premise machines.',tip:'Backups shorten recovery; redundancy reduces the capacity loss.'},
   bot:{title:'Someone brought a bot army.',body:'Automated traffic is crowding your gateway and reducing usable ingress.',tip:'Firewall protection filters the attack. Strict mode trades CPU for stronger filtering.'},
-  billing:{title:'The cloud bill just landed.',body:'Burst pricing has tripled the cost of managed capacity and cloud requests.',tip:'Economy autoscaling carries less idle capacity. Keep an eye on net income.'},
+  billing:{title:'The cloud bill just landed.',body:'Managed capacity and cloud requests cost 50% more.',tip:'Economy autoscaling carries less idle capacity. Keep an eye on net income.'},
 }
 export const emptyEventStats = (partial=false): EventStatistics => ({duration:0,durationSeconds:0,standardRequests:0,aiRequests:0,served:0,dropped:0,gross:0,expenses:0,potentialGross:0,extraRequests:0,missedByStage:{network:0,compute:0,memory:0,storage:0,ai:0},partial})
 export function integrateEvent(stats:EventStatistics,m:Metrics,dt:number,extraDemand:number,realDt=dt) {

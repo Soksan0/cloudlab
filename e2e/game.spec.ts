@@ -5,10 +5,38 @@ import {UPGRADES} from '../src/sim/upgrades'
 import {quotaForLevel} from '../src/sim/hardware'
 import type {GameState,UpgradeId} from '../src/sim/types'
 const SAVE_KEY='cloudlab-save-v1'
-test('diagnostic traffic preview is pure and bounded',async({page})=>{const s=full();s.paused=true;await openGame(page,s);const before=await snapshot(page),panel=await dashboard(page);await panel.getByRole('button',{name:'+ traffic',exact:true}).click();await expect(panel).toContainText('Preview 110%');expect(await snapshot(page)).toEqual(before);await panel.getByRole('button',{name:'Live traffic',exact:true}).click();await expect(panel).toContainText('Preview 100%')})
-test('4x presentation keeps bounded nodes and a single camera through view changes',async({page})=>{test.setTimeout(90000);const s=healthy();s.speed=4;await openGame(page,s);await page.clock.resume();await page.evaluate(()=>{(window as unknown as {longTasks:number[]}).longTasks=[];new PerformanceObserver(list=>{for(const entry of list.getEntries())(window as unknown as {longTasks:number[]}).longTasks.push(entry.duration)}).observe({type:'longtask',buffered:false})});for(let second=0;second<60;second+=5){await page.waitForTimeout(5000);await continueMajor(page)}for(let i=0;i<12;i++){await page.getByRole('button',{name:['Workshop','Server Interior','Service Flow'][i%3],exact:true}).click()}await expect(page.locator('.navigable-scene')).toHaveCount(1);await expect(page.getByRole('button',{name:/Minimap:/})).toHaveCount(1);expect(await page.getByTestId('profit-receipt').count()).toBeLessThanOrEqual(3);expect(await page.getByTestId('shroud-message').count()).toBeLessThanOrEqual(1);expect(await page.evaluate(()=>(window as unknown as {longTasks:number[]}).longTasks)).toEqual([])})
-test('Shroud warns once about stalled progress and minimap remains usable',async({page})=>{await openGame(page,sandbox());await page.clock.runFor(16000);await expect(page.getByTestId('shroud-message')).toBeVisible();await expect(page.getByTestId('shroud-message')).toContainText(/CPU|processor|compute/i);await page.getByRole('button',{name:'Dismiss Shroud'}).click();await page.clock.runFor(20000);await expect(page.getByTestId('shroud-message')).toHaveCount(0);const map=page.getByRole('button',{name:/Minimap:/});await expect(map).toBeVisible();await map.click();await expect(page.locator('.navigable-scene')).toHaveAttribute('data-camera-mode','manual')})
-for(const advanced of [false,true])test(`Operations sub-tabs render ${advanced?'advanced':'fresh'} company`,async({page})=>{await openGame(page,advanced?full():sandbox());const panel=await dashboard(page,'Operations');for(const name of ['Traffic','Protection','Scaling','Launch']){await panel.getByRole('button',{name,exact:true}).click();await expect(panel).toBeVisible();await expect(page.getByRole('heading',{name:'Shroud · Display interrupted'})).toHaveCount(0)}if(!advanced){await panel.getByRole('button',{name:'Scaling',exact:true}).click();await expect(panel.getByRole('button',{name:'Inspect Autoscaling →',exact:true})).toBeVisible()}})
+test('supporting hardware inspection names the part without inventing live meters',async({page})=>{const s=sandbox();s.paused=true;await page.setViewportSize({width:780,height:600});await openGame(page,s);await choose(page,'cpu');for(const name of ['Motherboard','Power supply','Cooling bank']){await page.getByRole('button',{name:'Inspect '+name,exact:true}).focus();await page.keyboard.press('Enter');await expect(page.getByRole('combobox',{name:'Component',exact:true})).toContainText(name==='Cooling bank'?'Cooling':name);await expect(page.getByTestId('tuning-console').getByRole('meter')).toHaveCount(0);await fits(page)}})
+test('guided learning remains playable at the compact desktop size',async({page})=>{await page.setViewportSize({width:780,height:600});await openGame(page);await page.getByRole('button',{name:'Start tutorial',exact:true}).click();await finishTutorial(page);expect((await snapshot(page)).tutorialComplete).toBe(true);await fits(page)})
+for(const scene of ['street','rooftop','operations','ai'])test(`progression artwork ${scene} keeps the new HUD and monitor usable`,async({page})=>{let s=scene==='street'?sandbox():scene==='rooftop'?sandbox(['cpu','memory','ssd','virtualization','server2','load_balancer']):scene==='operations'?ack(stepGame(sandbox(UPGRADES.filter(u=>u.id!=='ai').map(u=>u.id)),2.1)):full();s.paused=true;await page.setViewportSize({width:1440,height:900});await openGame(page,s);await fits(page);await page.screenshot({path:`test-results/cloudlab-scene-${scene}.png`})
+})
+test('view lifecycle keeps global listeners and DOM size bounded',async({page})=>{
+ await page.addInitScript(()=>{const active=new Map<EventTarget,Map<string,Set<EventListenerOrEventListenerObject>>>(),add=EventTarget.prototype.addEventListener,remove=EventTarget.prototype.removeEventListener;EventTarget.prototype.addEventListener=function(type,listener,options){if(listener&&(this===window||this===document)){let types=active.get(this);if(!types)active.set(this,types=new Map());let listeners=types.get(type);if(!listeners)types.set(type,listeners=new Set());listeners.add(listener)}return add.call(this,type,listener,options)};EventTarget.prototype.removeEventListener=function(type,listener,options){if(listener)active.get(this)?.get(type)?.delete(listener);return remove.call(this,type,listener,options)};(window as unknown as {listenerCount:()=>number}).listenerCount=()=>[...active.values()].reduce((sum,types)=>sum+[...types.values()].reduce((n,ls)=>n+ls.size,0),0)})
+ const s=healthy();s.paused=true;await openGame(page,s);const count=()=>page.evaluate(()=>(window as unknown as {listenerCount:()=>number}).listenerCount()),before=await count(),nodes=await page.locator('*').count()
+ for(let i=0;i<15;i++){await page.getByRole('button',{name:['Server Interior','Service Flow','Workshop'][i%3],exact:true}).click();await dashboard(page);await closeDashboard(page)}expect(await count()).toBeLessThanOrEqual(before);expect(await page.locator('*').count()).toBeLessThanOrEqual(nodes+20)
+})
+test('Only when asked persists but manual Shroud remains available without covering the purchase',async({page})=>{
+ await openGame(page,sandbox());await utility(page,'Settings');await page.getByRole('switch',{name:'Only when asked'}).click();await page.keyboard.press('Escape');await page.clock.runFor(60000);await expect(page.getByTestId('shroud-message')).toHaveCount(0)
+ await choose(page,'cpu');await page.getByRole('button',{name:'Shroud',exact:true}).click();const bubble=page.getByTestId('shroud-message');await expect(bubble).toBeVisible();await page.clock.runFor(100)
+ const a=await bubble.boundingBox(),b=await page.getByTestId('tuning-console').boundingBox();expect(Math.max(0,Math.min(a!.x+a!.width,b!.x+b!.width)-Math.max(a!.x,b!.x))*Math.max(0,Math.min(a!.y+a!.height,b!.y+b!.height)-Math.max(a!.y,b!.y))).toBe(0)
+ await snapshot(page);await page.reload();await utility(page,'Settings');await expect(page.getByRole('switch',{name:'Only when asked'})).toHaveAttribute('aria-checked','true')
+})
+test('compact policies, comparison options, storage pages and ledger fit without scrolling',async({page})=>{
+ await page.setViewportSize({width:780,height:600});const s=healthy();s.companyLevel=100;s.levelQuota=quotaForLevel(100);s.paused=true;s.metrics=calculateMetrics(s);await openGame(page,s)
+ for(const id of ['load_balancer','security','autoscaling','cloud','ai']){await choose(page,id,['cloud','ai'].includes(id)?'Equipment':'Technology');await page.getByText('Policies & running costs',{exact:true}).click();await fits(page)}
+ await choose(page,'ssd');for(const name of ['Space','IOPS','MiB/s']){await page.getByTestId('tuning-console').getByRole('button',{name,exact:true}).click();await fits(page)}
+ await choose(page,'cpu');const compare=page.getByRole('button',{name:/^Compare \d options/});if(await compare.isVisible()){await compare.click();await fits(page)}
+ const panel=await dashboard(page);for(const name of ['Processing','Storage','Fleet']){await panel.locator('.resource-groups').getByRole('button',{name,exact:true}).click();await fits(page)}await dashboard(page,'Finance');await panel.getByRole('button',{name:'Ledger',exact:true}).click();await fits(page)
+})
+test('dashboard reserves scene space and meter text has accessible contrast',async({page})=>{
+ await page.setViewportSize({width:1440,height:900});await openGame(page,sandbox());const panel=await dashboard(page),scene=await page.getByTestId('scene-viewport').boundingBox(),dock=await panel.boundingBox();expect(scene!.y+scene!.height).toBeLessThanOrEqual(dock!.y)
+ await page.setViewportSize({width:780,height:600});await expect(page.getByTestId('tuning-console')).toBeHidden();await fits(page);await page.setViewportSize({width:1440,height:900});await fits(page)
+ const colors=await panel.locator('.meter-heading span,.meter-values,.resource-meter>small').evaluateAll(nodes=>nodes.map(node=>getComputedStyle(node).color))
+ const luminance=(rgb:number[])=>rgb.map(c=>{c/=255;return c<=.04045?c/12.92:((c+.055)/1.055)**2.4}).reduce((s,c,i)=>s+c*[.2126,.7152,.0722][i],0),background=luminance([20,44,62]);for(const color of colors){const foreground=luminance(color.match(/[\d.]+/g)!.slice(0,3).map(Number));expect((Math.max(foreground,background)+.05)/(Math.min(foreground,background)+.05)).toBeGreaterThanOrEqual(4.5)}
+})
+test('Status uses live readings and removes hypothetical controls',async({page})=>{const s=full();s.paused=true;await openGame(page,s);const before=await snapshot(page),panel=await dashboard(page);await expect(panel.getByRole('button',{name:'+ traffic',exact:true})).toHaveCount(0);await expect(panel).toContainText('Estimated response');await expect(panel.getByRole('meter')).toHaveCount(3);expect(await snapshot(page)).toEqual(before)})
+test('4x presentation keeps bounded nodes and a single camera through view changes',async({page})=>{test.setTimeout(90000);const s=healthy();s.speed=4;await openGame(page,s);await page.clock.resume();await page.evaluate(()=>{(window as unknown as {longTasks:number[]}).longTasks=[];new PerformanceObserver(list=>{for(const entry of list.getEntries())(window as unknown as {longTasks:number[]}).longTasks.push(entry.duration)}).observe({type:'longtask',buffered:false})});for(let second=0;second<60;second+=5){await page.waitForTimeout(5000);await continueMajor(page)}for(let i=0;i<12;i++){await page.getByRole('button',{name:['Workshop','Server Interior','Service Flow'][i%3],exact:true}).click()}await expect(page.locator('.navigable-scene')).toHaveCount(1);await expect(page.getByRole('button',{name:/Minimap:/})).toHaveCount(0);expect(await page.getByTestId('profit-receipt').count()).toBeLessThanOrEqual(3);expect(await page.getByTestId('shroud-message').count()).toBeLessThanOrEqual(1);expect(await page.evaluate(()=>(window as unknown as {longTasks:number[]}).longTasks)).toEqual([])})
+test('Shroud warns once about stalled progress and respects dismissal',async({page})=>{await openGame(page,sandbox());await page.clock.runFor(16000);await expect(page.getByTestId('shroud-message')).toBeVisible();await expect(page.getByTestId('shroud-message')).toContainText(/CPU|processor|compute/i);await page.getByRole('button',{name:'Dismiss Shroud'}).click();await page.clock.runFor(20000);await expect(page.getByTestId('shroud-message')).toHaveCount(0);await expect(page.getByRole('button',{name:/Minimap:/})).toHaveCount(0)})
+for(const advanced of [false,true])test(`Inspector policies render ${advanced?'advanced':'fresh'} company`,async({page})=>{await openGame(page,advanced?full():sandbox());for(const id of ['load_balancer','security','autoscaling']){await choose(page,id,'Technology');await expect(page.getByRole('heading',{name:'Shroud · Display interrupted'})).toHaveCount(0)}await choose(page,'cloud');await page.getByText('Policies & running costs',{exact:true}).click();await expect(page.getByRole('switch',{name:'Budget Guard'})).toBeVisible()})
 const names:Record<string,string>={cpu:'CPU',memory:'Memory',ssd:'Storage (SSD)',network:'Network',cloud:'Cloud capacity',ai:'AI capacity'}
 const errors=new WeakMap<Page,string[]>()
 test.beforeEach(async({page})=>{const list:string[]=[];errors.set(page,list);page.on('pageerror',error=>list.push(error.message))})
@@ -22,15 +50,14 @@ async function openGame(page:Page,state?:GameState|string){await page.clock.inst
 async function snapshot(page:Page):Promise<GameState>{return page.evaluate(key=>{window.dispatchEvent(new Event('pagehide'));return JSON.parse(localStorage.getItem(key)!)},SAVE_KEY)}
 function balanced(s:GameState){const r=s.revenue;expect(s.cash).toBeCloseTo(r.opening+r.gross+r.grants+r.rewards-r.purchases-r.expenses,6)}
 async function utility(page:Page,name:string){await page.getByRole('button',{name:'Menu',exact:true}).click();await page.getByRole('button',{name,exact:true}).click()}
-async function dashboard(page:Page,tab='Performance'){if(!await page.getByTestId('performance-dashboard').isVisible())await page.getByRole('button',{name:'Performance & Operations',exact:true}).click();await page.getByTestId('performance-dashboard').getByRole('button',{name:tab,exact:true}).click();return page.getByTestId('performance-dashboard')}
+async function dashboard(page:Page,tab='Status'){if(!await page.getByTestId('performance-dashboard').isVisible())await page.getByRole('button',{name:'Performance & Operations',exact:true}).click();await page.getByTestId('performance-dashboard').getByRole('button',{name:tab,exact:true}).click();return page.getByTestId('performance-dashboard')}
 async function closeDashboard(page:Page){if(await page.getByTestId('performance-dashboard').isVisible())await page.getByRole('button',{name:'Close dashboard',exact:true}).click()}
 async function choose(page:Page,id:string,category:'Equipment'|'Technology'='Equipment'){
  await closeDashboard(page)
  if(await page.getByRole('button',{name:/^Tune components/}).isVisible())await page.getByRole('button',{name:/^Tune components/}).click()
  const panel=page.getByTestId('tuning-console');await panel.getByRole('button',{name:category,exact:true}).click()
  const chooser=panel.getByRole('combobox',{name:'Component',exact:true});await chooser.click()
- const name=category==='Equipment'?names[id]:UPGRADES.find(u=>u.id===id)!.name
- await page.getByRole('option',{name,exact:true}).click();await page.clock.runFor(450)
+ await page.locator('[role=option][data-value="'+id+'"]').click();await page.clock.runFor(450)
  await expect(chooser).toHaveAttribute('data-value',id)
 }
 async function continueMajor(page:Page){for(let i=0;i<20&&await page.getByTestId('major-announcement').isVisible();i++)await page.getByTestId('major-announcement').getByRole('button',{name:/^Continue/}).click()}
@@ -44,7 +71,7 @@ async function finishTutorial(page:Page,stopAt?:number){
   else if(step===2)await page.getByRole('button',{name:'Inspect CPU',exact:true}).click()
   else if(step===3)await page.getByRole('button',{name:'Upgrade CPU',exact:true}).click()
   else if(step===4)await page.getByRole('button',{name:'Performance & Operations',exact:true}).click()
-  else if(step===5)await page.getByTestId('performance-dashboard').getByRole('button',{name:/^Inspect upgrade/}).click()
+  else if(step===5)await page.getByTestId('performance-dashboard').getByRole('button',{name:/^Inspect options/}).click()
   else if(step===6)await page.getByRole('button',{name:'Upgrade Memory',exact:true}).click()
   else if(step===7)await page.getByRole('button',{name:'Upgrade Storage (SSD)',exact:true}).click()
   else if(step===8)await page.getByRole('button',{name:'Achievements',exact:true}).click()
@@ -61,7 +88,7 @@ async function fitsElement(page:Page,element:Locator,label:string){
  if(label==='Dashboard'){
   // Projection rays intentionally extend below the panel; interactive content must fit its housing.
   const content=await element.locator('.dashboard-content').boundingBox();expect(content!.y+content!.height,'Dashboard content fits its housing').toBeLessThanOrEqual(box!.y+box!.height+1)
-  const clipped=await element.evaluate(node=>{const r=node.getBoundingClientRect();return [...node.querySelectorAll('button')].filter(button=>{const b=button.getBoundingClientRect();return b.width>0&&b.height>0&&(b.left<r.left-1||b.right>r.right+1||b.top<r.top-1||b.bottom>r.bottom+1)}).map(button=>button.getAttribute('aria-label')||button.textContent)})
+  const clipped=await element.evaluate(node=>{const r=node.getBoundingClientRect();return [...node.querySelectorAll('button')].filter(button=>button.checkVisibility()).filter(button=>{const b=button.getBoundingClientRect();return b.width>0&&b.height>0&&(b.left<r.left-1||b.right>r.right+1||b.top<r.top-1||b.bottom>r.bottom+1)}).map(button=>button.getAttribute('aria-label')||button.textContent)})
   expect(clipped,'Dashboard controls stay inside the panel').toEqual([])
  }else{
   const dimensions=await element.evaluate(node=>({scroll:node.scrollHeight,client:node.clientHeight}))
@@ -74,7 +101,7 @@ async function fits(page:Page){
  await fitsElement(page,page.getByTestId('tuning-console'),'Console');await fitsElement(page,page.getByRole('listbox'),'Chooser');await fitsElement(page,page.getByTestId('performance-dashboard'),'Dashboard');await fitsElement(page,page.getByRole('dialog'),'Dialog')
  const panel=page.getByTestId('tuning-console')
  if(await panel.isVisible()){
-  const clipped=await panel.evaluate(node=>{const panel=node.getBoundingClientRect();return [...node.querySelectorAll('button')].filter(control=>!control.closest('[role="listbox"]')).filter(control=>{const r=control.getBoundingClientRect();return r.width>0&&r.height>0&&(r.left<panel.left-1||r.right>panel.right+1||r.top<panel.top-1||r.bottom>panel.bottom+1)}).map(control=>control.getAttribute('aria-label')||control.textContent)})
+  const clipped=await panel.evaluate(node=>{const panel=node.getBoundingClientRect();return [...node.querySelectorAll('button')].filter(control=>control.checkVisibility()&&!control.closest('[role="listbox"]')).filter(control=>{const r=control.getBoundingClientRect();return r.width>0&&r.height>0&&(r.left<panel.left-1||r.right>panel.right+1||r.top<panel.top-1||r.bottom>panel.bottom+1)}).map(control=>control.getAttribute('aria-label')||control.textContent)})
   expect(clipped,'Console controls not clipped').toEqual([])
  }
 }
@@ -86,7 +113,7 @@ test('welcome requires a choice and reading time remains free',async({page})=>{
 
 test('tutorial teaches live monitoring, upgrades and explicit reward claims',async({page})=>{
  await page.setViewportSize({width:1280,height:720});await openGame(page);await page.getByRole('button',{name:/^Start tutorial/}).click()
- const before=await snapshot(page);await page.clock.runFor(2000);expect((await snapshot(page)).elapsed).toBe(before.elapsed)
+ const before=await snapshot(page);await page.clock.runFor(2000);expect((await snapshot(page)).elapsed).toBeGreaterThan(before.elapsed)
  await finishTutorial(page);const s=await snapshot(page);expect(s.tutorialComplete).toBe(true);expect(s.upgradeTimes.cpu).toBeLessThanOrEqual(30);expect(s.upgrades).toEqual(expect.arrayContaining(['cpu','memory','ssd']));balanced(s);await fits(page)
 })
 
@@ -102,7 +129,7 @@ test('tutorial task reload and replay preserve company finances',async({page})=>
 test('complete tutorial replay changes no live inventory or reward ledger',async({page})=>{
  const s=full();s.paused=true;await openGame(page,s);const before=await snapshot(page)
  await utility(page,'Help');await page.getByRole('button',{name:'Replay tutorial',exact:true}).click();await finishTutorial(page)
- const after=await snapshot(page);expect(after.cash).toBe(before.cash);expect(after.revenue).toEqual(before.revenue);expect(after.equipmentLevels).toEqual(before.equipmentLevels);expect(after.claimedAchievementIDs).toEqual(before.claimedAchievementIDs);expect(after.paused).toBe(true)
+ const after=await snapshot(page);expect(after.cash).toBe(before.cash);expect(after.revenue).toEqual(before.revenue);expect(after.equipmentLevels).toEqual(before.equipmentLevels);expect(after.claimedAchievementIDs).toEqual(before.claimedAchievementIDs);expect(after.paused).toBe(true);expect(after.elapsed).toBe(before.elapsed);expect(after.storageUsedGiB).toBe(before.storageUsedGiB);expect(after.companyLevel).toBe(before.companyLevel);expect(after.totalServed).toBe(before.totalServed)
 })
 
 test('tutorial component chooser advances the CPU task and reloading restores reward claim',async({page})=>{
@@ -176,7 +203,7 @@ test('clicking a visible component keeps a manually framed camera in place',asyn
 
 test('missing Storage prerequisite leads directly to an accessible upgrade',async({page})=>{
  const s=sandbox(['cpu','memory']);s.paused=true;await openGame(page,s);await choose(page,'virtualization','Technology')
- const panel=page.getByTestId('tuning-console');await panel.getByRole('button',{name:/^Upgrade Storage \(SSD\)/}).click();await expect(page.getByRole('combobox',{name:'Component',exact:true})).toHaveAttribute('data-value','ssd')
+ const panel=page.getByTestId('tuning-console');await panel.getByRole('button',{name:/^Inspect Storage \(SSD\)/}).click();await expect(page.getByRole('combobox',{name:'Component',exact:true})).toHaveAttribute('data-value','ssd')
  await panel.getByRole('button',{name:'Upgrade Storage (SSD)',exact:true}).click();await choose(page,'virtualization','Technology');await expect(panel.getByRole('button',{name:'Unlock Virtualization',exact:true})).toBeEnabled()
 })
 
@@ -201,7 +228,7 @@ test('maximum hardware offers a continued fleet expansion action',async({page})=
 
 test('a capped-resource monitor diagnosis links to the repeatable expansion card',async({page})=>{
  const s=healthy();s.upgrades=s.upgrades.filter(id=>id!=='ai');s.equipmentLevels.ai=0;s.aiProvisioned=0;s.aiLaunchLevel=null;s.provisioning.gpuTarget=0;s.fleet.servers=100;s.companyLevel=2000;s.levelProgress=0;s.levelQuota=quotaForLevel(2000);s.eventCheckpoint=2000;s.metrics=calculateMetrics(s);s.paused=true;expect(s.metrics.bottleneck).toBe('network')
- await openGame(page,s);const panel=await dashboard(page);await panel.getByRole('button',{name:/^Inspect upgrade/}).click();await expect(page.getByRole('combobox',{name:'Component',exact:true})).toHaveAttribute('data-value','network');await expect(page.getByRole('button',{name:'Add network link',exact:true})).toBeEnabled()
+ await openGame(page,s);const panel=await dashboard(page);await panel.getByRole('button',{name:/^Inspect options/}).click();await expect(page.getByRole('combobox',{name:'Component',exact:true})).toHaveAttribute('data-value','network');await expect(page.getByRole('button',{name:'Add network link',exact:true})).toBeEnabled()
  const before=await snapshot(page);await page.getByRole('button',{name:'Add network link',exact:true}).click();const after=await snapshot(page);expect(after.fleet.networkLinks).toBe(before.fleet.networkLinks+1);await expect(page.getByTestId('purchase-feedback')).toContainText('FLEET');balanced(after)
 })
 
@@ -219,19 +246,15 @@ test('failed purchases and collapsed console do not lose selection',async({page}
 })
 
 test('monitor dashboard is obvious, live and available from every view',async({page})=>{
- await openGame(page,sandbox());await expect(page.getByRole('button',{name:'Service Flow',exact:true})).toHaveAttribute('aria-pressed','true');await page.getByRole('button',{name:'Workshop',exact:true}).click();await expect(page.getByRole('button',{name:'Open Performance & Operations',exact:true})).toBeVisible();await page.getByRole('button',{name:'Open Performance & Operations',exact:true}).click()
- const panel=page.getByTestId('performance-dashboard');await expect(panel).toBeVisible();await expect(page.getByTestId('tuning-console')).toBeHidden();const before=await snapshot(page)
+ await openGame(page,sandbox());await expect(page.getByRole('button',{name:'Workshop',exact:true})).toHaveAttribute('aria-pressed','true');await expect(page.getByRole('button',{name:'Open Performance & Operations',exact:true})).toBeVisible();await page.getByRole('button',{name:'Open Performance & Operations',exact:true}).click()
+ const panel=page.getByTestId('performance-dashboard');await expect(panel).toBeVisible();const before=await snapshot(page)
  await page.clock.runFor(3000);const after=await snapshot(page);expect(after.elapsed).toBeGreaterThan(before.elapsed+2.5);expect(after.totalServed).toBeGreaterThan(before.totalServed);await expect(panel).toContainText(/CPU|processor/i)
- await panel.getByRole('button',{name:/^Inspect upgrade/}).click();await expect(panel).toBeHidden();await expect(page.getByRole('combobox',{name:'Component',exact:true})).toHaveAttribute('data-value','cpu')
+ await panel.getByRole('button',{name:/^Inspect options/}).click();await expect(panel).toBeHidden();await expect(page.getByRole('combobox',{name:'Component',exact:true})).toHaveAttribute('data-value','cpu')
  for(const view of ['Server Interior','Service Flow']){await page.getByRole('button',{name:view,exact:true}).click();await dashboard(page);await expect(panel).toBeVisible();await closeDashboard(page)}
  await expect(page.locator('.room-sticker')).toHaveCount(0)
 })
 
-test('dashboard finance reconciles and Operations policies do not stop play',async({page})=>{
- await openGame(page,full());const panel=await dashboard(page,'Finance');await expect(panel).toContainText(/revenue|cost|balance/i);const before=await snapshot(page);await page.clock.runFor(1500);expect((await snapshot(page)).elapsed).toBeGreaterThan(before.elapsed)
- await panel.getByRole('button',{name:'Operations',exact:true}).click();await panel.getByRole('button',{name:'Scaling',exact:true}).click();const guard=panel.getByRole('switch',{name:'Budget Guard',exact:true});await expect(guard).toHaveAttribute('aria-checked','true');await guard.click();expect((await snapshot(page)).budgetGuard.enabled).toBe(false);await guard.click();expect((await snapshot(page)).budgetGuard.enabled).toBe(true)
- await panel.getByRole('button',{name:'Stop rentals',exact:true}).click();expect((await snapshot(page)).rentalsEnabled).toBe(false);await panel.getByRole('button',{name:'Resume rentals',exact:true}).click();await page.clock.runFor(2500);expect((await snapshot(page)).metrics.cloud).toBeGreaterThan(0);balanced(await snapshot(page))
-})
+test('Finance reconciles and inspector policies do not stop play',async({page})=>{await openGame(page,full());const panel=await dashboard(page,'Finance');await expect(panel).toContainText(/revenue|cost|balance/i);const before=await snapshot(page);await page.clock.runFor(1500);expect((await snapshot(page)).elapsed).toBeGreaterThan(before.elapsed);await choose(page,'cloud');await page.getByText('Policies & running costs',{exact:true}).click();const guard=page.getByRole('switch',{name:'Budget Guard',exact:true});await guard.click();expect((await snapshot(page)).budgetGuard.enabled).toBe(false);await guard.click();expect((await snapshot(page)).budgetGuard.enabled).toBe(true);await page.getByRole('button',{name:'Stop all rented workers',exact:true}).click();expect((await snapshot(page)).rentalsEnabled).toBe(false);await page.getByRole('button',{name:'Resume rented workers',exact:true}).click();await page.clock.runFor(2500);expect((await snapshot(page)).metrics.cloud).toBeGreaterThan(0);balanced(await snapshot(page))})
 
 test('menu keeps only utility actions and trophy claims rewards exactly once',async({page})=>{
  await openGame(page,sandbox());await page.getByRole('button',{name:'Menu',exact:true}).click();const menu=page.getByRole('navigation',{name:'Lab menu',exact:true})
@@ -257,7 +280,7 @@ for(const speed of [1,2,4] as const){
  test(`event reaction time stays real at ${speed}× and result popups stop reading costs`,async({page})=>{
   let s=sandbox();s.speed=speed;s=triggerIncident(s,'marketing');await openGame(page,s);const notice=page.getByTestId('major-announcement');await expect(notice).toBeVisible();const before=await snapshot(page);await page.clock.runFor(3000);expect((await snapshot(page)).elapsed).toBe(before.elapsed)
   await continueMajor(page);await page.clock.runFor(30_000);let active=await snapshot(page);expect(active.incident).not.toBeNull();expect(active.incident!.remaining).toBeCloseTo(45,0)
-  await dashboard(page,'Events');await expect(page.getByTestId('performance-dashboard')).toContainText(/0:45|00:45|45/);await closeDashboard(page)
+  await dashboard(page,'History');await expect(page.getByTestId('performance-dashboard')).toContainText(/0:45|00:45|45/);await closeDashboard(page)
   await page.clock.runFor(46_000);await expect(page.getByTestId('event-summary')).toBeVisible();const ended=await snapshot(page),report=ended.eventReports[0];expect(report.durationSeconds).toBeCloseTo(75,1);await page.clock.runFor(3000);expect((await snapshot(page)).cash).toBe(ended.cash);balanced(ended)
  })
 }
@@ -275,7 +298,7 @@ test('subdued receipts show operating profit only and remain bounded',async({pag
 
 test('zero completed requests show negative profit and stable HUD dimensions',async({page})=>{
  let s=sandbox(['cpu','memory','ssd','virtualization']);s=ack(triggerIncident(s,'hardware'));s.metrics=calculateMetrics(s);expect(s.metrics.served).toBe(0);await openGame(page,s)
- const badge=page.getByTestId('profit-badge'),cash=page.getByTestId('cash-display'),before=await cash.boundingBox();await expect(badge).toContainText(/Profit.*[−-]/i)
+ const badge=page.getByTestId('profit-badge'),cash=page.getByTestId('cash-display'),before=await cash.boundingBox();await expect(badge).toContainText(/[−-]/)
  const channels=(await badge.evaluate(node=>getComputedStyle(node).color)).match(/[\d.]+/g)!.map(Number);expect(channels[0]).toBeGreaterThan(channels[1]);await page.clock.runFor(1500);const after=await cash.boundingBox();expect(after!.width).toBeCloseTo(before!.width,1);expect(after!.height).toBeCloseTo(before!.height,1);expect((await snapshot(page)).cash).toBeLessThan(s.cash)
 })
 
@@ -306,8 +329,10 @@ for(const viewport of [{width:780,height:600},{width:1024,height:600},{width:128
  test(`desktop ${viewport.width}×${viewport.height} keeps views, chooser and live dashboard inside the viewport`,async({page})=>{
   await page.setViewportSize(viewport);const s=full();s.paused=true;await openGame(page,s)
   for(const view of ['Workshop','Server Interior','Service Flow']){await page.getByRole('button',{name:view,exact:true}).click();await page.clock.runFor(450);await fits(page);await page.screenshot({path:`test-results/cloudlab-endless-${viewport.width}-${view.toLowerCase().replaceAll(' ','-')}.png`})}
-  const chooser=page.getByRole('combobox',{name:'Component',exact:true});await chooser.click();await fits(page);await page.keyboard.press('Escape')
-  for(const tab of ['Performance','Finance','Operations','Events']){await dashboard(page,tab);await fits(page);await page.screenshot({path:`test-results/cloudlab-dashboard-${viewport.width}-${tab.toLowerCase()}.png`})}
+  for(const id of ['cpu','memory','ssd','network','cloud','ai']){await choose(page,id);await fits(page);const pages=page.getByTestId('tuning-console').locator('.reading-tabs button');for(let i=0;i<await pages.count();i++){await pages.nth(i).click();await fits(page)}}
+  for(const item of UPGRADES.filter(u=>!['cpu','memory','ssd'].includes(u.id))){await choose(page,item.id,'Technology');await fits(page);const policies=page.locator('.inspector-policies');if(await policies.count()){await policies.locator('summary').click();await fits(page)}}
+  await choose(page,'cpu');const chooser=page.getByRole('combobox',{name:'Component',exact:true});await chooser.click();await fits(page);await page.keyboard.press('Escape')
+  for(const tab of ['Status','Finance','History']){await dashboard(page,tab);await fits(page);await page.screenshot({path:`test-results/cloudlab-dashboard-${viewport.width}-${tab.toLowerCase()}.png`})}
   await closeDashboard(page);await page.getByRole('button',{name:'Achievements',exact:true}).click();await fits(page);await page.getByRole('dialog').getByRole('button',{name:'Close',exact:true}).click()
   for(const name of ['Help','Save','Settings']){await utility(page,name);await fits(page);await page.getByRole('dialog').getByRole('button',{name:'Close',exact:true}).click()}
  })
@@ -315,7 +340,7 @@ for(const viewport of [{width:780,height:600},{width:1024,height:600},{width:128
 
 test('all locked cards and highest storage tier stay compact',async({page})=>{
  await page.setViewportSize({width:780,height:600});const s=sandbox();s.paused=true;await openGame(page,s)
- for(const id of ['cpu','memory','ssd','network','cloud','ai']){await choose(page,id);await fits(page)}
+ for(const id of ['cpu','memory','ssd','network','cloud','ai']){await choose(page,id);await fits(page);const pages=page.getByTestId('tuning-console').locator('.reading-tabs button');for(let i=0;i<await pages.count();i++){await pages.nth(i).click();await fits(page)}}
  for(const item of UPGRADES.filter(u=>!['cpu','memory','ssd'].includes(u.id))){await choose(page,item.id,'Technology');await fits(page)}
 })
 

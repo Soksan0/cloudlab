@@ -60,7 +60,15 @@ export type Hardware = {
 }
 
 export type FleetPool = 'servers'|'storage'|'network'|'cloud'|'ai'
+export type ResourceId = 'cpu'|'memory'|'space'|'iops'|'transfer'|'network'|'cloud'|'cloud-memory'|'ai'
+export type ResourceState = 'healthy'|'strained'|'headroom'|'limiting'|'starting'|'stopped'|'unavailable'
+export type ResourceReading = {
+  id:ResourceId; name:string; component:string; scope:'owned fleet'|'rented pool'|'shared service';
+  unit:string; offered:number; used:number; capacity:number; rejected:number; pressure:number;
+  availability:'online'|'starting'|'stopped'|'unavailable'; estimated:true; reserved?:number; admitted?:number;
+}
 export type Metrics = {
+  resources:ResourceReading[]
   admittedStandard:number;admittedAI:number;eligibleCloudWork:number;workloadMix:{cpuHeavy:number;dataHeavy:number;ai:number};activeServers:number;standbyServers:number;standardPrice:number;aiPrice:number
 
   hardware: Hardware

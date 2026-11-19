@@ -1,8 +1,8 @@
 import { getHardware, WORKLOAD, STANDARD_PRICE, AI_PRICE, MAX_LEVELS, levelDemand,quotaForLevel,workloadMix } from './hardware'
 export {getHardware,hardwareSummary,getHardwareExplanation,getMilestone,STANDARD_PRICE,AI_PRICE} from './hardware'
 import { UPGRADES, upgradeById } from './upgrades'
-import type { AchievementDefinition, AdvisorRecommendation, Announcement, EquipmentDefinition, EquipmentId, GameState, Incident, IncidentKind, Metrics, PolicyState, UpgradeId,FleetPool } from './types'
-import { emptyEventStats, integrateEvent, EVENT_STORIES, STAGES, TECHNOLOGY_TIPS } from './feedback'
+import type { AchievementDefinition, AdvisorRecommendation, Announcement, EquipmentDefinition, EquipmentId, GameState, Incident, IncidentKind, Metrics, PolicyState, UpgradeId,FleetPool,ResourceReading } from './types'
+import { emptyEventStats, integrateEvent, EVENT_STORIES, STAGES, TECHNOLOGY_TIPS,eventFacts } from './feedback'
 
 export const EQUIPMENT: EquipmentDefinition[] = [
   {id:'cpu',name:'CPU Module',baseCost:80,increase:3},
@@ -191,7 +191,7 @@ export const createInitialState = (): GameState => {
 const demandFor=(s:GameState)=>{
  if(training(s))return s.tutorial.step<=1?25:s.tutorial.step<=3?55:60
  let demand=levelDemand(s.companyLevel)
- if(s.incident?.kind==='marketing')demand*=s.companyLevel<10?1.3:1.5
+ if(s.incident?.kind==='marketing')demand*=eventFacts('marketing',s).surge
  if(s.challenge.active)demand*=2
  return demand
 }
@@ -222,6 +222,7 @@ export const calculateMetrics=(state:GameState,trafficMultiplier=1):Metrics=>{
  const cacheHits=owned(s,'cache')?standard*(1-w.writeFraction)*.35*(1-mix.cpuHeavy*.75-mix.dataHeavy*.5):0
  standard-=cacheHits
  if(h.storageUsedGiB>=h.storageGiB-.000000001){losses.storage+=standardWrites+aiWrites;missedRevenue.storage+=(standardWrites*standardPrice+aiWrites*aiPrice)*60;standard-=standardWrites;ai-=aiWrites;standardWrites=0;aiWrites=0}
+ const rejectedWrites=losses.storage
  const ioRatio=Math.min(1,h.storageIOPS/Math.max(.000001,standard*stdOps+ai*w.aiOperations),h.storageMiBs/Math.max(.000001,standard*stdIo+ai*w.aiIoMiB))
  const eligibleCloudWork=(standard*stdCPU+ai*2)*ioRatio
  const overhead=owned(s,'virtualization')?.95:1,strict=owned(s,'security')&&s.policies.firewall==='strict'?.92:1
@@ -234,17 +235,36 @@ export const calculateMetrics=(state:GameState,trafficMultiplier=1):Metrics=>{
  const cloud=h.cloudInstances*h.cloudInstanceCores*2.8e9/w.instructions*.95,compute=localCompute+cloud,memory=localMemory+h.cloudInstances*Math.floor((h.cloudInstanceRamGiB-1)*1024/w.memoryMiB)/w.residenceSeconds
  const storage=Math.min(h.storageIOPS/w.operations,h.storageMiBs/w.ioMiB),aiCapacity=h.gpuCount*(h.gpuVRAMGiB>=w.modelVRAMGiB?1/w.gpuSeconds:0)
  const cpuLoad=standard*stdCPU+ai*2;restrict('compute',compute/Math.max(.000001,cpuLoad))
+ const executedCPU=standard*stdCPU+ai*2
  const memoryLoad=standard*stdMemory+ai*2;restrict('memory',memory/Math.max(.000001,memoryLoad))
  const appProcessed=standard*stdCPU+ai*2,ioLoad=standard*stdOps/w.operations+ai*w.aiOperations/w.operations
+ const offeredIOPS=standard*stdOps+ai*w.aiOperations,offeredMiBs=standard*stdIo+ai*w.aiIoMiB
  restrict('storage',Math.min(h.storageIOPS/Math.max(.000001,standard*stdOps+ai*w.aiOperations),h.storageMiBs/Math.max(.000001,standard*stdIo+ai*w.aiIoMiB)))
+ const usedIOPS=standard*stdOps+ai*w.aiOperations,usedMiBs=standard*stdIo+ai*w.aiIoMiB,offeredGPU=ai
+ const rejectedStorageIO=losses.storage-rejectedWrites,iopsFirst=h.storageIOPS/Math.max(.000001,offeredIOPS)<=h.storageMiBs/Math.max(.000001,offeredMiBs)
  const gpuLost=Math.max(0,ai-aiCapacity),aiRatio=ai>0?(ai-gpuLost)/ai:0;losses.ai+=gpuLost;missedRevenue.ai+=gpuLost*aiPrice*60;ai-=gpuLost;aiWrites*=aiRatio
  const served=cacheHits+standard+ai,dropped=Math.max(0,demand-served),successRate=served/Math.max(.001,demand),onPrem=Math.min(localCompute,localMemory),cloudUsed=Math.max(0,appProcessed-Math.min(appProcessed,onPrem))
- const gross=((cacheHits+standard)*standardPrice+ai*aiPrice)*60,billFactor=s.incident?.kind==='billing'?1.5:1
+ const gross=((cacheHits+standard)*standardPrice+ai*aiPrice)*60,billFactor=s.incident?.kind==='billing'?eventFacts('billing',s).billing:1
  const expenses=.8+Math.max(0,activeServers-1)*1.5+(owned(s,'backup')?.3:0)+(owned(s,'security')?.4:0)+(owned(s,'cache')?.4:0)+(h.cloudInstances*.65+h.gpuCount*1.2+cloudUsed*60*.0001)*billFactor
  const utilizations={network:clamp(networkLoad/Math.max(.001,network),0,1),compute:clamp(cpuLoad/Math.max(.001,compute),0,1),memory:clamp(memoryLoad/Math.max(.001,memory),0,1),storage:clamp(ioLoad/Math.max(.001,storage),0,1),ai:aiCapacity?clamp(admittedAI/aiCapacity,0,1):0}
  const dominant=STAGES.reduce((best,k)=>losses[k]>losses[best]?k:best,STAGES[0]),bottleneck=successRate>=.98?'healthy':dominant
  const writeRateGiB=h.storageUsedGiB>=h.storageGiB?0:(standardWrites+aiWrites)*w.writeKiB/(1024*1024)
- return {hardware:h,routes:{arrived:demand,cache:cacheHits,origin:standard,ai,rejected:dropped,pending:0},writeRateGiB,cloudUsed,missedRevenue,demand,standardDemand,aiDemand,aiServed:ai,losses,served,dropped,successRate,network,compute,memory,storage,onPrem,cloud,aiCapacity,cacheHits,latency:w.residenceSeconds*1000+250*Math.max(...Object.values(utilizations))**3,gross,expenses,net:gross-expenses,utilizations,bottleneck,admittedStandard,admittedAI,eligibleCloudWork,workloadMix:mix,activeServers,standbyServers:Math.max(0,h.serverCount-activeServers),standardPrice,aiPrice}
+ const reading=(id:ResourceReading['id'],name:string,component:string,scope:ResourceReading['scope'],unit:string,offered:number,used:number,capacity:number,rejected:number,availability:ResourceReading['availability']='online',reserved?:number):ResourceReading=>({id,name,component,scope,unit,offered,used,capacity,rejected,pressure:offered/Math.max(.000001,capacity),availability,estimated:true,reserved})
+ const ownedCPU=Math.min(executedCPU,localCompute),remoteCPU=Math.max(0,executedCPU-ownedCPU),instructionGi=w.instructions/1e9
+ const memoryGiBPerRate=w.memoryMiB/1024*w.residenceSeconds,localWorking=Math.min(memoryLoad,localMemory)*memoryGiBPerRate,reserved=activeServers*(h.reservedRamGiB+(owned(s,'virtualization')?.25:0))
+ const rentalAvailability=(id:'cloud'|'ai',count:number):ResourceReading['availability']=>!owned(s,id)?'unavailable':!s.rentalsEnabled?'stopped':s.provisioning.remaining>0&&(id==='cloud'?s.provisioning.target:s.provisioning.gpuTarget)>count?'starting':count>0?'online':'stopped'
+ const resources:ResourceReading[]=[
+  reading('cpu','CPU','cpu','owned fleet','G instructions/s',Math.min(cpuLoad,localCompute+(cloud>0?0:Math.max(0,cpuLoad-compute)))*instructionGi,ownedCPU*instructionGi,localCompute*instructionGi,cloud>0?0:losses.compute,activeServers?'online':'unavailable'),
+  reading('memory','Memory','memory','owned fleet','GiB',Math.min(memoryLoad,localMemory+(h.cloudInstances>0?0:Math.max(0,memoryLoad-memory)))*memoryGiBPerRate+reserved,localWorking+reserved,activeServers*h.ramGiB,h.cloudInstances>0?0:losses.memory,activeServers?'online':'unavailable',reserved),
+  reading('space','Stored data','ssd','shared service','GiB',h.storageUsedGiB,h.storageUsedGiB,h.storageGiB,rejectedWrites),
+  reading('iops','Storage operations','ssd','shared service','IOPS',offeredIOPS,usedIOPS,h.storageIOPS,iopsFirst?rejectedStorageIO:0),
+  reading('transfer','Storage transfer','ssd','shared service','MiB/s',offeredMiBs,usedMiBs,h.storageMiBs,iopsFirst?0:rejectedStorageIO),
+  {...reading('network','Network','network','shared service','Mbps',networkLoad*w.networkKiB*1024*8/1e6,Math.min(networkLoad,network)*w.networkKiB*1024*8/1e6,network*w.networkKiB*1024*8/1e6,losses.network),admitted:admittedStandard+admittedAI},
+  reading('cloud','Cloud workers','cloud','rented pool','G instructions/s',Math.max(0,cpuLoad-localCompute)*instructionGi,remoteCPU*instructionGi,cloud*instructionGi,h.cloudInstances>0?losses.compute:0,rentalAvailability('cloud',h.cloudInstances)),
+  reading('cloud-memory','Cloud RAM','cloud','rented pool','GiB',Math.max(0,memoryLoad-localMemory)*memoryGiBPerRate+h.cloudInstances,Math.min(Math.max(0,memoryLoad-localMemory),Math.max(0,memory-localMemory))*memoryGiBPerRate+h.cloudInstances,h.cloudInstances*h.cloudInstanceRamGiB,h.cloudInstances>0?losses.memory:0,rentalAvailability('cloud',h.cloudInstances),h.cloudInstances),
+  reading('ai','GPU workers','ai','rented pool','inferences/s',offeredGPU,ai,aiCapacity,losses.ai,rentalAvailability('ai',h.gpuCount)),
+ ]
+ return {resources,hardware:h,routes:{arrived:demand,cache:cacheHits,origin:standard,ai,rejected:dropped,pending:0},writeRateGiB,cloudUsed,missedRevenue,demand,standardDemand,aiDemand,aiServed:ai,losses,served,dropped,successRate,network,compute,memory,storage,onPrem,cloud,aiCapacity,cacheHits,latency:w.residenceSeconds*1000+250*Math.max(...Object.values(utilizations))**3,gross,expenses,net:gross-expenses,utilizations,bottleneck,admittedStandard,admittedAI,eligibleCloudWork,workloadMix:mix,activeServers,standbyServers:Math.max(0,h.serverCount-activeServers),standardPrice,aiPrice}
 }
 
 export type TutorialAction='inspect-server'|'select-cpu'|'open-dashboard'|'inspect-bottleneck'|'open-trophy'|'claim-rewards'|'open-hint'
@@ -266,6 +286,8 @@ const syncTutorial=(s:GameState)=>{s.tutorialStep=s.tutorial.step;s.tutorialComp
 const moveTutorial=(s:GameState,step:number)=>{s.tutorial.step=Math.min(10,step);s.tutorial.phase=[1,2,4,5,8,9].includes(step)?'action':'explain';s.tutorial.demoRemaining=0;s.tutorial.demonstrated=false;s.paused=s.tutorial.phase==='explain';syncTutorial(s)}
 export const startTutorial=(state:GameState)=>{const s=structuredClone(state);s.tutorial={status:'active',step:1,phase:'action',demoRemaining:0,replay:false,demonstrated:false,returnPaused:state.tutorial.status==='welcome'?false:state.paused};s.paused=false;syncTutorial(s);s.metrics=calculateMetrics(s);return s}
 export const replayTutorial=(state:GameState)=>{const s=startTutorial(state);s.tutorial.replay=true;s.tutorial.returnPaused=state.paused;s.metrics=calculateMetrics(s);return s}
+/** An unsaved teaching company: animation and counters never advance the live replay company. */
+export const createTrainingProjection=(live:GameState)=>{const s=structuredClone(live),upgrades=getEffectiveUpgrades(live);s.upgrades=upgrades;s.equipmentLevels={cpu:upgrades.includes('cpu')?1:0,memory:upgrades.includes('memory')?1:0,ssd:upgrades.includes('ssd')?1:0,network:0,cloud:0,ai:0};s.fleet={servers:1,storageGroups:1,networkLinks:1};s.storageUsedGiB=32;s.cloudProvisioned=0;s.aiProvisioned=0;s.provisioning={target:0,gpuTarget:0,remaining:0};s.incident=null;s.challenge.active=false;s.tutorial.replay=false;s.elapsed=0;s.activeSeconds=0;s.metrics=calculateMetrics(s);return s}
 export const skipTutorial=(state:GameState)=>{const s=structuredClone(state),replay=s.tutorial.replay;s.tutorial.status='skipped';s.tutorial.phase='explain';s.tutorial.demoRemaining=0;s.paused=s.tutorial.returnPaused??false;syncTutorial(s);s.metrics=calculateMetrics(s);addLog(s,'Open Lab online. Watch performance and upgrade the bottleneck.','good');if(!replay)awardAchievements(s);return s}
 export const tutorialAction=(state:GameState,action:TutorialAction)=>{const t=state.tutorial;if(t.status!=='active'||t.phase!=='action'||getTutorialLesson(state).expectedAction!==action)return state;if(action==='claim-rewards'&&!t.replay&&getClaimableRewards(state).count>0)return state;const s=structuredClone(state);moveTutorial(s,t.step+1);s.metrics=calculateMetrics(s);return s}
 export const advanceTutorial=(state:GameState)=>{
@@ -293,20 +315,20 @@ export const canPurchase = (s: GameState, id: UpgradeId) => {
 }
 
 const makeIncident = (kind: IncidentKind, s: GameState): Incident => {
-  const duration=kind==='hardware'?(owned(s,'backup')?60:90):kind==='bot'&&owned(s,'security')?60:75
+  const facts=eventFacts(kind,s),duration=facts.duration
   const details = {
     marketing: ['Marketing traffic spike', 'A promotion is sending more visitors than forecast. More capacity and caching can help.'],
     hardware: ['Server hardware fault', 'One machine is degraded. Backup recovery shortens the outage; redundancy reduces the capacity loss.'],
     bot: ['Automated bot attack', 'Suspicious traffic is consuming gateway capacity. Firewall protection reduces the impact and duration.'],
     billing: ['Cloud bill shock', 'Cloud capacity and usage temporarily cost 50% more. Economy autoscaling carries less spare capacity.'],
   }
-  return { kind, title: details[kind][0], detail: details[kind][1], remaining: duration, total: duration, stats:emptyEventStats() }
+  return { kind, title: details[kind][0], detail: facts.detail, remaining: duration, total: duration, stats:emptyEventStats() }
 }
 
 const announceIncident = (s:GameState) => {
   if(!s.incident)return
   const story=EVENT_STORIES[s.incident.kind]
-  announce(s,'incident',story.title,`${story.body} Event time: ${Math.ceil(s.incident.remaining)} seconds.`,{illustration:s.incident.kind,tip:story.tip})
+  announce(s,'incident',story.title,`${s.incident.detail} Event time: ${Math.ceil(s.incident.remaining)} active seconds.`,{illustration:s.incident.kind,tip:story.tip})
 }
 
 const queueIncident = (s: GameState, kind: IncidentKind) => {
@@ -458,7 +480,8 @@ const tick=(s:GameState,dt:number,realDt:number,current:Metrics)=>{
  awardAchievements(s)
 }
 export const stepGame=(state:GameState,realDelta:number):GameState=>{
- if(training(state)&&state.tutorial.phase!=='demo')return state
+ if(training(state)&&state.tutorial.phase==='explain')return state
+ if(state.tutorial.status==='active'&&state.tutorial.replay)return state
  if(state.paused||getNextAnnouncement(state)||!Number.isFinite(realDelta)||realDelta<=0)return state
  const s=structuredClone(state);let remaining=realDelta
  while(remaining>.000001&&!s.paused&&!getNextAnnouncement(s)){
