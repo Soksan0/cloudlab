@@ -1,0 +1,46 @@
+{
+  "activeSeconds": 301.1635640826651,
+  "wallSeconds": 318.945,
+  "log": [
+    {
+      "active": 60.46423600000047,
+      "hud": "CLOUDLAB\nAVAILABLE FUNDS\n$724.49\nPROFIT / SIM MIN\n+$8.84\nSERVICE\n100%\nCOMPANY\nLV 2\n\u2630 Menu",
+      "objective": "Service target met \u00b7 Prepare for the next level",
+      "nodes": 341
+    },
+    {
+      "active": 117.80116408266024,
+      "event": "CITY FEED \u00b7 INCOMING\nCITY FEED // TRENDING\nYour campaign went viral!\n\nDemand rises 15% \u2192 30% \u2192 15% across three waves. Contain it: serve at least 90% overall and finish with 15 seconds at 98% served.\n\nDuration \u00b7 01:15 active play\n\nAdd capacity or cache repeated requests to handle the surge.\n\nContinue \u2192"
+    },
+    {
+      "active": 122.85086408266004,
+      "hud": "CLOUDLAB\nAVAILABLE FUNDS\n$1,349.06\nPROFIT / SIM MIN\n+$13.18\nMarketing traffic spike\n01:10\nIncoming wave \u00b7 100% served \u00b7 5/15s stable\n\u2630 Menu",
+      "objective": "LV 5 \u00b7 Target \u226590% overall \u00b7 \u226598% for final 15s",
+      "nodes": 344
+    },
+    {
+      "active": 183.23186408265775,
+      "hud": "CLOUDLAB\nAVAILABLE FUNDS\n$2,422.02\nPROFIT / SIM MIN\n+$13.23\nMarketing traffic spike\n00:10\nStabilize \u00b7 100% served \u00b7 15/15s stable\n\u2630 Menu",
+      "objective": "LV 8 \u00b7 Target \u226590% overall \u00b7 \u226598% for final 15s",
+      "nodes": 344
+    },
+    {
+      "active": 192.80116408265724,
+      "event": "EVENT RESULTS\nCITY FEED // TRENDING\nMarketing campaign feedback\nContained\nRequests served\n100%\nNet profit\n$1,078.14\nDuration\n01:15\n\nYou contained the event. Keep some headroom for the next wave.\n\nContinue \u2192"
+    },
+    {
+      "active": 245.58246408265526,
+      "hud": "CLOUDLAB\nAVAILABLE FUNDS\n$3,682.41\nPROFIT / SIM MIN\n+$13.20\nSERVICE\n100%\nCOMPANY\nLV 10\n\u2630 Menu",
+      "objective": "Service target met \u00b7 Prepare for the next level",
+      "nodes": 647
+    }
+  ],
+  "errors": [],
+  "balance": {
+    "hardware": 2,
+    "fleet": 16,
+    "coefficient": 0.2,
+    "maintenance": 0.1,
+    "rentalLimits": true
+  }
+}

@@ -53,7 +53,7 @@ export function useSceneCamera(width:number,height:number,focus:string|undefined
    if(svg.closest('.reduced-motion')||matchMedia('(prefers-reduced-motion: reduce)').matches){apply(next,g);return}
    const from={...camera.frame},start=performance.now()
    const tick=(now:number)=>{
-    const t=Math.min(1,(now-start)/300),eased=1-(1-t)**3
+    const t=Math.min(1,(now-start)/350),eased=1-(1-t)**3
     apply({x:from.x+(next.x-from.x)*eased,y:from.y+(next.y-from.y)*eased,width:from.width+(next.width-from.width)*eased,height:from.height+(next.height-from.height)*eased},g)
     if(t<1)animation=requestAnimationFrame(tick)
    }

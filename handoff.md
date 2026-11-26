@@ -1,95 +1,94 @@
 # CloudLab implementation handoff
 
-Updated 2026-11-19, Asia/Phnom_Penh. This replaces the old version-6 rollback handoff.
+Updated 26 November 2026, Asia/Phnom_Penh.
 
-## Current release and scope
+## Goal and current outcome
 
-Repository: `/Users/soksanhay/Documents/ChatGPT/ICT-209 AI/cloudlab`.
+Implemented “a clearer mission, a lighter HUD, and meaningful challenges” on clean baseline `cc695617bb5ebb0b1821533bffcc9f701a91f768` (saved Site version 9). Repository: `/Users/soksanhay/Documents/ChatGPT/ICT-209 AI/cloudlab`. Branch: `feat/cloudlab-v7-improvements`.
 
-This release implements **simpler play, trustworthy diagnostics, clearer learning**, using version 8 source `1e69cbfa9457d77b8a72df40a94a1bc9439aa6b1` as its baseline. Do not restore version 6 or reapply the discarded partial rollback patch. The branch is `feat/cloudlab-v7-improvements`; use `git log -1` for the resulting source-helper release commit.
+The pixel city, React/Vite, automatic routing, physical resource model, companies, and Workshop / Server Interior / Service Flow are preserved. Normal monitoring is a 96px integrated HUD; expanded Status / Finance / History is capped at 220px and resizes the scene. Compact monitoring collapses the inspector. The introduction explains the player's role and mission; exact tutorial targets, detour guidance, selection/install feedback, sampled request tickets, observed service results, and cancelable scene transitions make the loop clearer.
 
-Site: https://cloudlab-infra-tycoon.jetdew16.chatgpt.site
+Incidents are infrastructure encounters with centered countdowns, phases, explicit containment objectives, and honest operating results. Traffic encounters use the approved 15/40/20-second phase schedule; legacy active incidents finish without being converted to the new rules. Failed encounters preserve the company.
+
+The economy is deliberately changed after experiments, not by an unvalidated multiplier. See `ECONOMY_PROPOSAL.md` for the selected configuration, methods, measurements, and limits. No prestige, resets, new currency, manual wiring, offline earnings, backend, power-management system, or replacement queue engine was added.
+
+## Architectural decisions
+
+- `calculateMetrics`, resource readings, the ledger, and engine clocks remain authoritative. Cash now derives from accounting totals, preventing accumulated drift. Presentation never awards cash or determines service/event/tutorial completion.
+- `PerformanceHUD` and `StatusDashboard` consume the existing shared 60-active-second history. Samples are not persisted. Sampled request tickets and profit receipts remain bounded; receipts exclude claims, grants, and purchases.
+- `tutorialTargets` shares action names/semantic anchors with UI controls. `TutorialGuide` tracks camera/resizing changes, distinguishes selecting from buying, and points back to a usable control after unrelated exploration or closing a panel. It uses a static cue for reduced motion, a gentle bob otherwise, and 8/20-second reminders.
+- Tutorial replay has separate displayed equipment plus the unsaved teaching projection. A maximum-tier live company can complete replay without changing its live inventory, cash, storage, elapsed time, or progression.
+- `useSceneTransition` separates cross-view dissolves from simulation and handles cancellation. Within-view camera travel is 350ms; direct manipulation cancels automatic camera motion. Manual framing survives simulation updates.
+- `usePresentation` bounds semantic presentation events; purchase/activation feedback carries its own telemetry baseline. Service comparisons distinguish predictions from observed ledger/work deltas, label traffic changes, and do not attribute unrelated earlier purchases to rental activation. Feedback avoids the inspector and minimizes covering the selected equipment.
+- Save schema is **7**. It persists encounter progress and balance terms. `cloudlab-save-pre-v7` retains recoverable old saves; earlier recovery keys remain readable. Existing operating terms and already-earned checkpoint rewards are grandfathered. Existing running/provisioning rental capacity is mapped into a sufficient configured ceiling.
+- Selected balance: hardware 2× after introductory tier; repeat fleet base 16×; count coefficient 20%; additional active-owned maintenance 10%; newly priced VM/GPU base charges 25% of nominal workload revenue; future recurring checkpoints capped at $1,000. Configured rental ceilings are explicit game settings. Their upfront deployment fees are fictional, not an AWS price claim.
+- Budget Guard trims unused capacity while preserving needed pending startup and useful scaling checks. It preserves debt and owned equipment.
+
+## What was tried and corrected
+
+The original 36-configuration price grid passed its level-100 screen but no candidate qualified with two strategies at every decision delay through level 1,000. Unlimited autoscaling bypassed deliberate expansion. A separate configured-ceiling revision qualified; all original failures and revised results are retained.
+
+An early deep benchmark excluded provisioning from stalled time; it was stopped and rerun with complete ordinary-stall measurement. Independent cash accumulation caused long-run ledger drift and was replaced with canonical ledger-derived cash. Maximum-tier replay, stale activation comparisons, interrupted fades, misleading hardware-failure advice, 01:16 rounding for 75-second reports, tutorial detours, and compact Firefox overflow were fixed with regressions.
+
+The iterative 30-minute UI review's simple purchasing strategy sometimes neglected spare servers. It is recorded as an agent strategy limitation, not proof that real students understand the game. Two simultaneous browser suites once collided in a shared trace directory; the final isolated complete suite passes.
+
+## Verification and evidence
+
+- Production build passes.
+- **153 unit tests pass**; four opt-in benchmark cases are skipped in ordinary runs.
+- **81 browser scenarios pass** in the final isolated suite, including Chromium/Firefox/WebKit and 780×600, 1024×600, 1280×720, 1440×900, 1920×1080. Views, cards, chooser, policies, monitor pages, dialogs, keyboard paths, reduced motion, tutorial, migration, events, cash, and saves are covered without gameplay scrolling.
+- Final selected balance: nine strategy/delay combinations reach level 10,001 after the recovery fix. First successful upgrade 4–12 active seconds; longest ordinary stalls 8/22/40 seconds; zero recorded reserve-gate failures; ledgers reconcile. Every selected strategy passes at 0/5/10-second delays.
+- Ordinary-UI endurance: **1,801.53 active seconds**, 47 observations, no browser errors. Separate selected-balance fresh run: **301.16 active seconds**, guided setup and first encounter, no browser errors. These are agent-run sessions, not a human student study.
+- Sustained 4× browser run, bounded history/receipts/DOM/listeners, transition lifecycle, and no observed long tasks in that run pass. Visual review inspected progression scenes, selected hardware, compact monitoring, finance, and encounter layouts.
+- Evidence: `PLAYTEST_REPORT.md`, `ECONOMY_PROPOSAL.md`, tracked JSON under `benchmarks/results/`. Transient screenshots/traces are ignored; progress-only benchmark files are ignored.
+
+## Delivery and exact next step
+
+Existing Site: https://cloudlab-infra-tycoon.jetdew16.chatgpt.site
 Project: `appgprj_6afa9e6b5aac81919edd603746760ef4`.
+Access was rechecked before packaging: custom owner-only policy, one owner, no groups; previous saved version 9 is retained.
 
-The audience is owner-only (custom policy, sole owner, no groups). Publication uses the existing Site and native Sites version history; the previous saved version 8 remains available for recovery. Native publication receipts in the delivering chat/Sites history identify the new saved version and deployment. Do not infer deployment identifiers from this document or republish without checking that history.
+This handoff is part of the source package, so the source helper's final commit and native publication receipt are recorded in the delivering chat / Sites history. Use `git log -1` for the release source commit. If resuming before a successful publication receipt, finish that same package/publication operation rather than creating another Site. After successful publication, no required implementation remains; the next useful step is real-student playtesting, especially late-game choice/pacing. Do not infer human comprehension from automated checks.
 
-The normal screen now concentrates on money, operating profit, service health, company progress, the objective, and one selected inspector. React/Vite, pixel artwork, automatic routes, physical hardware, owned companies, catalog IDs, prices, rewards, production workloads, 25-second level quotas, 2% linear fleet expansion prices, and the financial ledger are preserved. No backend, offline earnings, prestige, currency, manual wiring, power management, or new queueing engine was added.
+## Exact changed file paths in this release
 
-## Architecture and behavior
-
-- `calculateMetrics` remains the financial/simulation authority. Its additional `ResourceReading[]` is independent of React. It distinguishes offered pressure from executed use, owned CPU/RAM from rented CPU/RAM, storage space from IOPS/bandwidth, effective network ingress/admitted requests, and GPU availability. CPU/RAM rejection uses local-first allocation; storage write/IO rejection is attributed once. Summed rejection matches customer outcomes. These are explicitly modeled estimates.
-- One 60-sample, timestamped active-second history lives in `useLiveFeed`; no samples are saved in company data. Partial active seconds survive pauses; hidden/paused time is excluded. New companies/imports and entry/exit from replay clear presentation history. The same readings feed the rail, inspector, dashboard, and Service Flow. Hysteresis prevents strain flicker; a full bar alone is not proof of rejected service.
-- `TuningInspector` combines purpose, current reading/history, upgrade preview, one purchase action, optional comparisons, and Learn more. Space/IOPS/transfer and rented CPU/RAM use tabs. `getInterventions` previews funded copies at one workload snapshot; delayed rentals preview online capacity without advancing time or billing. Max previews use actual affordable quantities. Cost/improvement/operating-cost awards use stable ties. Alternative actions must improve current service; protection is marked future-facing.
-- `StatusDashboard` replaces the old dashboard with Status / Finance / History. It reserves scene height instead of covering the workshop. Below 1100px, opening it collapses the inspector. Policies are in the Load Balancer, Security, Cloud, AI, or Autoscaling inspector. Finance retains the reconciled secondary ledger; reports remain paginated. The minimap, detached diagnostics dock, repeated Focus action, traffic preview, nested Operations tabs, and Copy save action are removed.
-- Selection and manual camera framing remain presentation state. Explicit navigation focuses the target; direct equipment selection and simulation updates preserve manual framing. Custom selectors retain keyboard support. Read-only motherboard/power/cooling inspection names the selected part without fabricating live measurements.
-- Protected tutorial action steps run traffic; explanatory dialogs pause. Required purchases remain funded and company-level advancement/incidents remain suppressed during training. Replay uses an ephemeral projection, preserving live cash, elapsed time, data, purchases, rewards, and levels; it does not force a finishing view.
-- Shroud responds manually, waits 15 active seconds before unsolicited failure advice, observes a 45-second cooldown, suppresses a dismissed condition, avoids automatic purchase commentary, and offers Only when asked. That preference is stored separately as `cloudlab-help-only-asked`. Overlay placement accounts for controls, selected targets, the dashboard, tutorial, and feedback.
-- Passive money displays refresh once a second; deliberate spending is immediate. Operating receipts exclude rewards/purchases and remain capped at three. Purchase feedback lasts 2.6 seconds. Readings use redundant shapes and cyan/amber/vermilion/lavender states, with restrained motion and reduced-motion support.
-- Corrected language includes tier-zero Storage (HDD), SSD tiers as configured teaching limits, Application Cache behind the shared uplink, effective workload-dependent cache hits, simulated provisioning/policy/achievement clocks, shared event severity definitions, the first 30% surge, 50% higher cloud billing, future-only backup recovery protection, reserved failover headroom, and at least 98% served.
-
-## Compatibility and modeling limits
-
-Company schema stays version 6. Existing loading/migration, pre-migration backups, imports, claims, financial reconciliation, and the bounded achievement/report cursors remain. No new persisted company fields were necessary; new metrics are recalculated on load. Help preferences and histories are separate from companies.
-
-CPU instructions, IPC, workload sizes, GPU throughput, and all prices remain teaching assumptions. Estimated response time retains the existing pressure formula and is labeled accordingly. No queue backlog, per-core imbalance, watts, or latency percentiles are invented. Power and cooling remain explanatory components. Production economy constants are unchanged; do not ship the benchmark's experimental settings.
-
-## Verification
-
-- `npm run build`: passes.
-- `npm test`: 99 passing unit tests; the opt-in benchmark is skipped during ordinary runs.
-- `npm run test:e2e`: 69 browser scenarios in the final suite, including Chromium plus Firefox/WebKit desktop matrices. Every equipment/technology card, resource tab, policy disclosure, selector, dashboard page, and utility overlay is exercised at 780×600, 1024×600, 1280×720, 1440×900, and 1920×1080 without gameplay scrolling or clipped controls.
-- A final 18-scenario follow-up verifies resizing an already-open 1440px dashboard into a compact window, the full three-browser desktop matrix, compact training, and capped fleet cards after the responsive CSS adjustment.
-- Interactive training at 780×600 and the normal laptop size; skip/reload/replay isolation; manual and contextual Shroud; event timing at 1×/2×/4×; achievement idempotency; immediate purchases and honest profit; legacy/invalid imports; camera gestures and keyboard selection; focus restoration; reduced motion and meter-text contrast are covered.
-- The production continuity test traverses 10,000 levels. Sustained 4× browser play runs for 60 real seconds, checks no long tasks, bounds receipts/history/artwork instances, and repeated view/dashboard changes leave global listener and DOM counts bounded.
-- Visual review inspected the street workshop, rooftop, operations/AI scenes, all three views, and compact/large monitoring layouts. Browser screenshots and reports are generated in ignored `test-results/` and `playwright-report/`.
-- The separately run economy benchmark passes 18 configurations to level 1,001 with 108 checkpoint records and ledger assertions. See `ECONOMY_PROPOSAL.md` and tracked `benchmarks/results/balance-matrix.json` for methods, limitations, repeated reserves, recovery/funding waits, opportunities, service estimates, and recommendations.
-
-## Approaches corrected during this work
-
-The old diagnostic mapping treated clamped pressure as utilization and mixed owned/cloud compute. It was replaced by shared readings from the real calculation. Duplicate resource rejection and unavailable-as-standby counts were corrected. A technology/equipment ID collision initially hid Cloud Migration acquisition; its explicit acquisition path now works. Old native-width CSS and a later density override caused compact Firefox/Safari overflow; the inspector now honors its reserved width, removes repeated values, and fits all resource pages without shrinking essential labels below 14px. Tests were revised where they expected removed tabs, a minimap, a forced view switch, or frozen tutorial actions.
-
-An early benchmark agent repeatedly purchased remote workers during provisioning and reset startup timers. Those numbers were discarded. The retained agent waits for startup; its findings are separate from production. Longer quotas and 2%/4%/6% coefficients do not solve late-game cash accumulation. The report explicitly describes sampled reliability, immediate reward claims, one deterministic seed, and absent human decision/reading delays.
-
-## Exact changed paths
-
-All paths below are relative to the repository root above. `src/LiveDashboard.tsx` and `src/SystemDiagnostics.tsx` were deleted; `src/StatusDashboard.tsx` and the integrated inspector replace them.
-
-- `ECONOMY_PROPOSAL.md`
-- `benchmarks/balance-experiment.test.ts`
-- `benchmarks/results/balance-matrix.json`
-- `e2e/game.spec.ts`
-- `handoff.md`
-- `src/App.tsx`
-- `src/ComponentChooser.tsx`
-- `src/ComponentDiagnostics.tsx`
-- `src/InfrastructureMap.tsx`
-- `src/InspectorPolicies.tsx`
-- `src/LiveDashboard.tsx`
-- `src/ResourceMeter.tsx`
-- `src/ServerInterior.tsx`
-- `src/Shroud.tsx`
-- `src/StatusDashboard.tsx`
-- `src/SystemDiagnostics.tsx`
-- `src/TuningInspector.tsx`
-- `src/Workshop.tsx`
-- `src/components.ts`
-- `src/guidance.test.tsx`
-- `src/main.tsx`
-- `src/sim/diagnostics.test.ts`
-- `src/sim/diagnostics.ts`
-- `src/sim/engine.test.ts`
-- `src/sim/engine.ts`
-- `src/sim/feedback.ts`
-- `src/sim/hardware.ts`
-- `src/sim/interventions.ts`
-- `src/sim/types.ts`
-- `src/sim/upgrades.ts`
-- `src/simple.css`
-- `src/useCollisionAnchor.ts`
-- `src/useGuidance.ts`
-- `src/useLiveFeed.ts`
-- `src/useSceneCamera.ts`
-
-## Next step
-
-The approved implementation is complete. For a fresh coding session, first inspect the current Git commit and native Site version/deployment receipt so work starts from this release. Do not reopen the old rollback or silently change balance. Any further economy work should start with the separate report and an explicitly scoped proposal; no experimental constants are ready to ship. No additional feature work is required by this release plan.
+- `/Users/soksanhay/Documents/ChatGPT/ICT-209 AI/cloudlab/.gitignore`
+- `/Users/soksanhay/Documents/ChatGPT/ICT-209 AI/cloudlab/ECONOMY_PROPOSAL.md`
+- `/Users/soksanhay/Documents/ChatGPT/ICT-209 AI/cloudlab/PLAYTEST_REPORT.md`
+- `/Users/soksanhay/Documents/ChatGPT/ICT-209 AI/cloudlab/benchmarks/play-review.mjs`
+- `/Users/soksanhay/Documents/ChatGPT/ICT-209 AI/cloudlab/benchmarks/release-balance.test.ts`
+- `/Users/soksanhay/Documents/ChatGPT/ICT-209 AI/cloudlab/benchmarks/results/first-session.json`
+- `/Users/soksanhay/Documents/ChatGPT/ICT-209 AI/cloudlab/benchmarks/results/play-review.json`
+- `/Users/soksanhay/Documents/ChatGPT/ICT-209 AI/cloudlab/benchmarks/results/release-deep.json`
+- `/Users/soksanhay/Documents/ChatGPT/ICT-209 AI/cloudlab/benchmarks/results/release-screen.json`
+- `/Users/soksanhay/Documents/ChatGPT/ICT-209 AI/cloudlab/benchmarks/results/revised-deep.json`
+- `/Users/soksanhay/Documents/ChatGPT/ICT-209 AI/cloudlab/benchmarks/results/revised-screen.json`
+- `/Users/soksanhay/Documents/ChatGPT/ICT-209 AI/cloudlab/benchmarks/results/selected-final.json`
+- `/Users/soksanhay/Documents/ChatGPT/ICT-209 AI/cloudlab/e2e/game.spec.ts`
+- `/Users/soksanhay/Documents/ChatGPT/ICT-209 AI/cloudlab/handoff.md`
+- `/Users/soksanhay/Documents/ChatGPT/ICT-209 AI/cloudlab/src/App.tsx`
+- `/Users/soksanhay/Documents/ChatGPT/ICT-209 AI/cloudlab/src/EventHUD.tsx`
+- `/Users/soksanhay/Documents/ChatGPT/ICT-209 AI/cloudlab/src/InspectorPolicies.tsx`
+- `/Users/soksanhay/Documents/ChatGPT/ICT-209 AI/cloudlab/src/PerformanceHUD.tsx`
+- `/Users/soksanhay/Documents/ChatGPT/ICT-209 AI/cloudlab/src/ServiceResult.tsx`
+- `/Users/soksanhay/Documents/ChatGPT/ICT-209 AI/cloudlab/src/StatusDashboard.tsx`
+- `/Users/soksanhay/Documents/ChatGPT/ICT-209 AI/cloudlab/src/TuningInspector.tsx`
+- `/Users/soksanhay/Documents/ChatGPT/ICT-209 AI/cloudlab/src/TutorialGuide.tsx`
+- `/Users/soksanhay/Documents/ChatGPT/ICT-209 AI/cloudlab/src/main.tsx`
+- `/Users/soksanhay/Documents/ChatGPT/ICT-209 AI/cloudlab/src/mission.css`
+- `/Users/soksanhay/Documents/ChatGPT/ICT-209 AI/cloudlab/src/presentation.test.ts`
+- `/Users/soksanhay/Documents/ChatGPT/ICT-209 AI/cloudlab/src/sim/balance.ts`
+- `/Users/soksanhay/Documents/ChatGPT/ICT-209 AI/cloudlab/src/sim/diagnostics.test.ts`
+- `/Users/soksanhay/Documents/ChatGPT/ICT-209 AI/cloudlab/src/sim/encounters.ts`
+- `/Users/soksanhay/Documents/ChatGPT/ICT-209 AI/cloudlab/src/sim/endless.test.ts`
+- `/Users/soksanhay/Documents/ChatGPT/ICT-209 AI/cloudlab/src/sim/engine.test.ts`
+- `/Users/soksanhay/Documents/ChatGPT/ICT-209 AI/cloudlab/src/sim/engine.ts`
+- `/Users/soksanhay/Documents/ChatGPT/ICT-209 AI/cloudlab/src/sim/feedback.test.ts`
+- `/Users/soksanhay/Documents/ChatGPT/ICT-209 AI/cloudlab/src/sim/hardware.ts`
+- `/Users/soksanhay/Documents/ChatGPT/ICT-209 AI/cloudlab/src/sim/mission.test.ts`
+- `/Users/soksanhay/Documents/ChatGPT/ICT-209 AI/cloudlab/src/sim/types.ts`
+- `/Users/soksanhay/Documents/ChatGPT/ICT-209 AI/cloudlab/src/tutorialTargets.ts`
+- `/Users/soksanhay/Documents/ChatGPT/ICT-209 AI/cloudlab/src/useCollisionAnchor.ts`
+- `/Users/soksanhay/Documents/ChatGPT/ICT-209 AI/cloudlab/src/usePresentation.ts`
+- `/Users/soksanhay/Documents/ChatGPT/ICT-209 AI/cloudlab/src/useSceneCamera.ts`
+- `/Users/soksanhay/Documents/ChatGPT/ICT-209 AI/cloudlab/src/useSceneTransition.ts`

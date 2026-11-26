@@ -1,0 +1,7 @@
+import {useEffect,useRef,useState} from 'react'
+import type {GameState,PurchaseImpact} from './sim/types'
+export type PresentationEvent={serial:number;kind:'selection'|'purchase'|'activation'|'level';id:string;impact?:PurchaseImpact}
+export function usePresentation(state:GameState,selected:string,epoch:number){
+ const previous=useRef({selected,purchase:state.lastPurchase,cloud:state.cloudProvisioned,ai:state.aiProvisioned,level:state.companyLevel,epoch}),serial=useRef(0),[events,setEvents]=useState<PresentationEvent[]>([])
+ useEffect(()=>{const p=previous.current;previous.current={selected,purchase:state.lastPurchase,cloud:state.cloudProvisioned,ai:state.aiProvisioned,level:state.companyLevel,epoch};if(epoch!==p.epoch){setEvents([]);return}const add:(e:Omit<PresentationEvent,'serial'>)=>void=e=>setEvents(old=>[...old.slice(-5),{...e,serial:++serial.current}]);if(selected!==p.selected)add({kind:'selection',id:selected});if(state.lastPurchase&&state.lastPurchase!==p.purchase&&JSON.stringify(state.lastPurchase)!==JSON.stringify(p.purchase))add({kind:'purchase',id:state.lastPurchase.id,impact:state.lastPurchase});if(state.cloudProvisioned>p.cloud)add({kind:'activation',id:'cloud'});if(state.aiProvisioned>p.ai)add({kind:'activation',id:'ai'});if(state.companyLevel>p.level)add({kind:'level',id:String(state.companyLevel)})},[state.lastPurchase,selected,state.cloudProvisioned,state.aiProvisioned,state.companyLevel,epoch]);return events
+}

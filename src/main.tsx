@@ -8,6 +8,7 @@ import './pixel.css'
 import './compact.css'
 import './endless.css'
 import './simple.css'
+import './mission.css'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

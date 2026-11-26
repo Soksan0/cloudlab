@@ -1,65 +1,71 @@
-# Economy experiment: quotas and linear fleet prices
+# CloudLab balance selection — 26 November 2026
 
-Measured 2026-11-19. Production remains at the existing 25-second quota and 2% linear fleet-price coefficient. No experimental price, reward, demand, quota, or financial change ships in this release.
+This supersedes the 19 November recommendation to leave the version-9 economy unchanged. The earlier 18-run quota experiment remains in `benchmarks/results/balance-matrix.json` as historical evidence.
 
-## Recommendation
+## Release decision
 
-Keep production constants unchanged. None of the tested combinations maintains money as a meaningful late-game constraint. At level 1,000, all three most recent purchase reserve ratios are roughly 90–95%. Longer quotas substantially increase accumulated cash; increasing the tested fleet coefficient barely changes progression time. These measurements do not justify a production multiplier.
+Activate `{hardware:2, fleet:16, coefficient:0.2, maintenance:0.1, rentalLimits:true}`. Workload fees, physical specifications, the 98% progression target, and 25-second quotas remain controls.
 
-Use the existing 25-second / 2% setting as the control for a separate economy proposal. First investigate when purchases stop competing for funds, compare rental policies and mixed owned/rented strategies, and add human decision/reading delays. Revisit reward and cost relationships together rather than increasing every price. Preserve existing companies' money and purchases. This document recommends experiments, not new shipping constants.
+- Preserve introductory first-tier prices. Later hardware tiers cost 2× their previous unit price; fleet-wide hardware changes charge each affected owned machine/group/link.
+- Repeat expansions use 16× their previous base price and a 20% linear count coefficient. Bulk prices sum the individual count-dependent prices.
+- Newly priced active owned compute adds maintenance equal to 10% of its nominal standard-workload revenue. This is fictional game maintenance, not a power measurement.
+- A newly priced VM has a $5.32/simulated-minute base; a GPU has a $3.60 base. These are 25% of the respective modeled rated workload revenue. The existing disclosed usage charges and event surcharges remain additional.
+- Future recurring checkpoints cap at $1,000 each. Already-earned rewards are preserved.
+- Autoscaling operates between zero and the configured worker maximum. Capacity purchases raise that maximum and request startup. Deployment/setup fees are fictional game rules; changing a real AWS scaling-group maximum does not imply this upfront fee.
 
-## Method and interpretation
+## Reproducible selection
 
-Run `CLOUDLAB_BALANCE=1 npx vitest run benchmarks/balance-experiment.test.ts --silent=false`.
+Run these opt-in commands from the repository:
 
-- 18 deterministic runs: 25/35/45-second quotas × 2%/4%/6% linear fleet-price coefficients × capacity-first/cache-first strategies. Each reaches level 1,001 and records levels 5, 10, 20, 40, 100, and 1,000: 108 observations.
-- New sandbox companies, existing workload profiles, prices outside fleet expansion, rewards, events, default Economy policy, and Budget Guard. The agent immediately claims eligible rewards and acknowledges blocking dialogs. It checks approximately every five active seconds while healthy and every second under overload. It waits for pending rentals before purchasing the same remote pool again.
-- Capacity-first takes the current component's primary upgrade/expansion. Cache-first prefers Application Cache when it improves the current service, otherwise the same primary action. Both unlock eligible technologies while healthy. This is a narrow comparison, not an optimal strategy search.
-- Fleet coefficient changes are test-only ledger adjustments to one-unit expansion purchases. All checkpoint ledgers reconcile within $0.001. Experimental quota companies are not production save files.
-- `purchaseOpportunities` counts agent decisions with an available candidate, including funding waits; it does not mean a new distinct product appeared. `purchases` counts successful transactions. Three reserve observations are cash divided by cumulative opening funds, customer revenue, and rewards immediately after the last three purchases. The summary reserve is their mean.
-- Funding wait counts overloaded intervals where the chosen candidate is unaffordable. Recovery/stall includes all overloaded intervals, including provisioning and incidents. These are different measures. The bot's one-second maximum funding wait benefits from immediate claims and instant diagnosis; it does not predict human recovery time.
-- Service percentage is the workload-weighted sampled rate, using the interval's starting metrics. It is an estimate near event/level/purchase boundaries, not a percentile latency or a measured queue. Financial totals use the actual engine ledger. Repeated runs share one seed and no human reading delay, offline earnings, alternative rental policy, or delayed reward claiming.
+```sh
+CLOUDLAB_RELEASE_BALANCE=1 npx vitest run benchmarks/release-balance.test.ts
+CLOUDLAB_RELEASE_BALANCE=deep npx vitest run benchmarks/release-balance.test.ts
+CLOUDLAB_RELEASE_BALANCE=revised npx vitest run benchmarks/release-balance.test.ts
+CLOUDLAB_RELEASE_BALANCE=revised-deep npx vitest run benchmarks/release-balance.test.ts
+CLOUDLAB_RELEASE_BALANCE=selected npx vitest run benchmarks/release-balance.test.ts
+```
 
-## Findings
+The approved 36 combinations were screened through level 100 with capacity-first, cache-first, and rental-first choices, each at 0/5/10-second decision delays: 324 runs. All screened successfully. The following 324 runs through level 1,000 found no configuration with two strategies passing every delay. The result is deliberately `selected:null` in `release-deep.json`; no original-grid multiplier was activated.
 
-The baseline capacity strategy reaches level 100 with $166,291 and level 1,000 with $16,268,005. Its last three level-1,000 purchase reserves are 90.8%, 90.8%, and 90.8%. Cache-first uses 86 rather than 96 purchases by that checkpoint and arrives 36 active seconds earlier, with $43,347 more cash. That small time difference is not evidence of a universally better strategy.
+The structural gap was unlimited automatic rental growth, which could bypass deliberate capacity expansion. The revised experiment adds a configured scaling ceiling while retaining the same 36 price combinations, fees, workloads, and quotas. It screens another 324 runs. Deep validation has 84 recorded runs, including 24 that reach level 10,001. Remaining delays of an already-failing strategy can be pruned because that strategy cannot qualify. Failed candidates remain in the result file.
 
-At 2%, lengthening the quota from 25 to 45 seconds raises the capacity strategy's level-1,000 cash from $16.27 million to $29.80 million. Raising the coefficient from 2% to 6% at a 25-second quota lowers that cash by $112,456 (about 0.69%) and changes neither the sampled checkpoint time nor purchase count. Coefficients have no effect at early checkpoints before repeat fleet purchases.
+Candidate order is declared lexicographically: lower hardware multiplier, lower expansion-base multiplier, lower count coefficient, then lower maintenance. This prioritizes preserving access to hardware and expansion before reducing operating terms. The first qualifying candidate wins; no identical-price configuration tie arose. The selected candidate passes all three strategies, not merely the required two.
 
-Every configuration keeps sampled cumulative service above 99.9% by level 1,000. Maximum all-cause overload lasts 10–12 active seconds at that checkpoint. This demonstrates recoverability for these agents; it does not establish sufficiently interesting difficulty or remove the need for human playtesting. The separate production continuity test still exercises 10,000 levels.
+After the Budget Guard startup correction, a separate final rerun checks all nine selected strategy/delay combinations through level 10,001 against the actual release engine. All nine pass.
 
-## Baseline checkpoints: 25 seconds / 2% / capacity-first
+## Final measurements
 
-| Level | Active seconds | Cash | Purchases / opportunities | Max funding wait / all-cause stall (s) | Service estimate | Last three purchase reserves |
-| ---: | ---: | ---: | ---: | ---: | ---: | --- |
-| 5 | 127 | $869 | 5 / 20 | 1 / 3 | 99.56% | 52.8%, 17.4%, 1.0% |
-| 10 | 253 | $402 | 9 / 47 | 1 / 3 | 99.8% | 6.1%, 1.8%, 1.0% |
-| 20 | 477 | $1,573 | 12 / 96 | 1 / 3 | 99.87% | 0.4%, 8.2%, 0.3% |
-| 40 | 951 | $10,444 | 14 / 161 | 1 / 3 | 99.92% | 0.3%, 0%, 0.5% |
-| 100 | 2,423 | $166,291 | 18 / 165 | 1 / 4 | 99.97% | 57.3%, 56.9%, 56.6% |
-| 1000 | 24,010 | $16,268,005 | 96 / 243 | 1 / 11 | 99.94% | 90.8%, 90.8%, 90.8% |
+| Strategy | Decision delay | First upgrade | Longest ordinary stall | Sampled service | Level-10,000 cash | Last three reserve ratios |
+| --- | ---: | ---: | ---: | ---: | ---: | --- |
+| Capacity | 0 s | 4 s | 8 s | 99.815% | $946.26M | 57.1%, 57.4%, 57.6% |
+| Capacity | 5 s | 12 s | 22 s | 99.807% | $956.68M | 57.4%, 57.4%, 57.5% |
+| Capacity | 10 s | 12 s | 40 s | 99.791% | $966.86M | 57.5%, 57.4%, 57.5% |
+| Cache | 0 s | 4 s | 8 s | 99.814% | $966.24M | 58.4%, 58.7%, 58.8% |
+| Cache | 5 s | 12 s | 22 s | 99.805% | $975.87M | 58.8%, 58.7%, 58.8% |
+| Cache | 10 s | 12 s | 40 s | 99.788% | $989.80M | 58.8%, 58.7%, 58.9% |
+| Rental | 0 s | 4 s | 8 s | 99.768% | $2.16M | 0.2%, 0.1%, <0.1% |
+| Rental | 5 s | 12 s | 22 s | 99.758% | $0.79M | <0.1%, <0.1%, <0.1% |
+| Rental | 10 s | 12 s | 40 s | 99.736% | $37.36M | 2.2%, 2.1%, 2.0% |
 
-## Level-1,000 comparison
+All selected runs reach 10,001 with finite values, reconciled ledgers, and zero recorded reserve-gate failures. Ordinary stalled time includes provisioning; event time is tracked separately. Checkpoints record levels 5, 10, 20, 40, 100, 1,000, and 10,000. Recovery unit scenarios also exercise an unprepared first encounter across the full grid without claiming rewards, unused-rental trimming with retained debt, and needed GPU startup during losses.
 
-| Quota (s) | Fleet coefficient | Strategy | Active seconds | Cash | Purchases / opportunities | Max funding / stall (s) | Service estimate | Mean recent reserve |
-| ---: | ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| 25 | 2% | capacity | 24,010 | $16,268,005 | 96 / 243 | 1 / 11 | 99.94% | 90.8% |
-| 25 | 2% | cache | 23,974 | $16,311,352 | 86 / 233 | 1 / 10 | 99.94% | 91.1% |
-| 25 | 4% | capacity | 24,010 | $16,211,774 | 96 / 243 | 1 / 11 | 99.94% | 90.5% |
-| 25 | 4% | cache | 23,974 | $16,267,501 | 86 / 233 | 1 / 10 | 99.94% | 90.8% |
-| 25 | 6% | capacity | 24,010 | $16,155,549 | 96 / 243 | 1 / 11 | 99.94% | 90.1% |
-| 25 | 6% | cache | 23,974 | $16,223,660 | 86 / 233 | 1 / 10 | 99.94% | 90.5% |
-| 35 | 2% | capacity | 33,675 | $23,388,924 | 141 / 313 | 1 / 12 | 99.92% | 94.7% |
-| 35 | 2% | cache | 33,664 | $22,437,305 | 127 / 310 | 1 / 12 | 99.93% | 90.9% |
-| 35 | 4% | capacity | 33,675 | $23,250,266 | 141 / 313 | 1 / 12 | 99.92% | 94.1% |
-| 35 | 4% | cache | 33,664 | $22,313,755 | 127 / 310 | 1 / 12 | 99.93% | 90.4% |
-| 35 | 6% | capacity | 33,675 | $23,111,618 | 141 / 313 | 1 / 12 | 99.92% | 93.6% |
-| 35 | 6% | cache | 33,664 | $22,190,215 | 127 / 310 | 1 / 12 | 99.93% | 89.9% |
-| 45 | 2% | capacity | 43,669 | $29,797,511 | 141 / 330 | 1 / 12 | 99.93% | 95.0% |
-| 45 | 2% | cache | 43,661 | $28,586,809 | 126 / 326 | 1 / 12 | 99.95% | 91.1% |
-| 45 | 4% | capacity | 43,669 | $29,658,853 | 141 / 330 | 1 / 12 | 99.93% | 94.5% |
-| 45 | 4% | cache | 43,661 | $28,465,683 | 126 / 326 | 1 / 12 | 99.95% | 90.7% |
-| 45 | 6% | capacity | 43,669 | $29,520,205 | 141 / 330 | 1 / 12 | 99.93% | 94.1% |
-| 45 | 6% | cache | 43,661 | $28,344,567 | 126 / 326 | 1 / 12 | 99.95% | 90.4% |
+## Interpretation and safeguards
 
-All 108 checkpoint observations, including individual reserve ratios and total funding waits: [balance-matrix.json](benchmarks/results/balance-matrix.json). Earlier uncontrolled runs that repeatedly bought workers during provisioning were discarded; they over-rented and measured a different strategy.
+Reserve ratio retains the earlier experiment's definition: remaining cash divided by cumulative opening funds, customer revenue, and claimed rewards immediately after a purchase. The gate rejects three consecutive ratios above 60% at the sampled later checkpoints. **It is not cash divided by the next upgrade cost.** Large late-game absolute balances remain possible, particularly with owned capacity. Passing this arithmetic target is not proof that every late-game choice feels scarce or engaging.
+
+Agents claim rewards only as deliberate funding actions when a chosen intervention is unaffordable; rewards are never automatically credited by the engine. They acknowledge dialogs immediately, use one deterministic seed, and cannot represent human reading or comprehension time. Service reliability is sampled at interval starts, not measured percentile latency. The ledger uses integrated engine totals.
+
+Existing companies keep cash, stored data, purchases, reports, earned rewards, and level progress. Their current owned and running rented capacity retains old operating terms; a deliberate owned hardware upgrade adopts new terms for that affected fleet, while new rental capacity receives new rates. Existing running/provisioning remote capacity is mapped into the configured ceiling so migration cannot shrink it. Already-earned checkpoint bonuses keep their old values. A pre-v7 backup supports recovery.
+
+Budget Guard removes unused capacity without cancelling needed pending startup or permanently resetting useful scaling checks. It does not forgive expenses or silently clamp debt. Overbuilding a machine can still reduce operating profit; previews disclose the change.
+
+## Evidence
+
+- `release-screen.json`, `release-deep.json`: original grid and failed selection.
+- `revised-screen.json`, `revised-deep.json`: revised experiment and selection.
+- `selected-final.json`: nine release-engine reruns through 10,000 levels.
+- `play-review.json`: 1,801.53 active seconds of ordinary-UI endurance review.
+- `first-session.json`: 301.16 active seconds from a fresh selected-balance company.
+- `PLAYTEST_REPORT.md`: observed usability/teaching bugs, fixes, and review limits.
+
+The configured-limit relationship follows [AWS's scaling-limit documentation](https://docs.aws.amazon.com/autoscaling/ec2/userguide/asg-capacity-limits.html). The game does not claim its prices or modeled service rates are AWS prices or universal hardware benchmarks.

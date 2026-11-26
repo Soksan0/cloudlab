@@ -1,0 +1,254 @@
+{
+  "activeSeconds": 1801.5330172203944,
+  "wallSeconds": 1842.586,
+  "log": [
+    {
+      "active": 60.947438000000496,
+      "hud": "CLOUDLAB\nAVAILABLE FUNDS\n$44.76\nPROFIT / SIM MIN\n+$10.76\nSERVICE\n100%\nCOMPANY\nLV 2\n\u2630 Menu",
+      "objective": "Service target met \u00b7 Prepare for the next level",
+      "nodes": 321
+    },
+    {
+      "active": 118.23365746938912,
+      "event": "CITY FEED \u00b7 INCOMING\nCITY FEED // TRENDING\nYour campaign went viral!\n\nCustomer demand is 30% higher. More capacity or Application Cache can help.\n\nDuration \u00b7 01:15 active play\n\nAdd capacity or cache repeated requests to handle the surge.\n\nContinue \u2192"
+    },
+    {
+      "active": 123.23345746938891,
+      "hud": "CLOUDLAB\nAVAILABLE FUNDS\n$197.85\nPROFIT / SIM MIN\n+$15.10\nMarketing traffic spike\n01:11\nIncoming wave \u00b7 100% served \u00b7 5/15s stable\nFinish with 15 seconds at \u226598% served \u00b7 \u226590% overall\n\u2630 Menu",
+      "objective": "LV 5 \u00b7 Service target met \u00b7 Prepare for the next level",
+      "nodes": 323
+    },
+    {
+      "active": 183.66445746938675,
+      "hud": "CLOUDLAB\nAVAILABLE FUNDS\n$130.67\nPROFIT / SIM MIN\n+$17.71\nMarketing traffic spike\n00:10\nStabilize \u00b7 100% served \u00b7 22.7/15s stable\nFinish with 15 seconds at \u226598% served \u00b7 \u226590% overall\n\u2630 Menu",
+      "objective": "LV 8 \u00b7 Service target met \u00b7 Prepare for the next level",
+      "nodes": 324
+    },
+    {
+      "active": 193.23365746938617,
+      "event": "EVENT RESULTS\nCITY FEED // TRENDING\nMarketing campaign feedback\nContained\nRequests served\n99.9%\nNet profit\n$1,306.55\nDuration\n01:15\n\nYour system kept up with the event.\n\nContinue \u2192"
+    },
+    {
+      "active": 223.4323574693851,
+      "event": "LAB MILESTONE\nVM 1\nVM 2\nVM 3\nAcquired: Virtualization\n\nRuns isolated virtual machines on your existing hardware.\n\nContinue \u2192"
+    },
+    {
+      "active": 245.96495746938436,
+      "hud": "CLOUDLAB\nAVAILABLE FUNDS\n$787.04\nPROFIT / SIM MIN\n+$17.68\nSERVICE\n100%\nCOMPANY\nLV 10\n\u2630 Menu",
+      "objective": "Service target met \u00b7 Prepare for the next level",
+      "nodes": 301
+    },
+    {
+      "active": 306.2292574693953,
+      "hud": "CLOUDLAB\nAVAILABLE FUNDS\n$2,126.11\nPROFIT / SIM MIN\n+$20.07\nSERVICE\n100%\nCOMPANY\nLV 13\n\u2630 Menu",
+      "objective": "Service target met \u00b7 Prepare for the next level",
+      "nodes": 302
+    },
+    {
+      "active": 354.4148674709066,
+      "event": "CITY FEED \u00b7 INCOMING\nCITY FEED // TRENDING\nYour campaign went viral!\n\nCustomer demand is 50% higher. More capacity or Application Cache can help.\n\nDuration \u00b7 01:15 active play\n\nAdd capacity or cache repeated requests to handle the surge.\n\nContinue \u2192"
+    },
+    {
+      "active": 367.06426747090956,
+      "hud": "CLOUDLAB\nAVAILABLE FUNDS\n$520.65\nPROFIT / SIM MIN\n+$29.40\nMarketing traffic spike\n01:03\nIncoming wave \u00b7 100% served \u00b7 10.2/15s stable\nFinish with 15 seconds at \u226598% served \u00b7 \u226590% overall\n\u2630 Menu",
+      "objective": "LV 15 \u00b7 Service target met \u00b7 Prepare for the next level",
+      "nodes": 327
+    },
+    {
+      "active": 382.36366747091296,
+      "event": "LAB MILESTONE\nAcquired: Second Server\n\nAdds another physical machine to share the work.\n\nContinue \u2192"
+    },
+    {
+      "active": 427.42856747092327,
+      "hud": "CLOUDLAB\nAVAILABLE FUNDS\n$2,493.12\nPROFIT / SIM MIN\n+$32.61\nMarketing traffic spike\n00:02\nStabilize \u00b7 100% served \u00b7 70.5/15s stable\nFinish with 15 seconds at \u226598% served \u00b7 \u226590% overall\n\u2630 Menu",
+      "objective": "LV 18 \u00b7 Service target met \u00b7 Prepare for the next level",
+      "nodes": 622
+    },
+    {
+      "active": 429.4148674709235,
+      "event": "EVENT RESULTS\nCITY FEED // TRENDING\nMarketing campaign feedback\nContained\nRequests served\n99.8%\nNet profit\n$2,571.93\nDuration\n01:16\n\nYour system kept up with the event.\n\nContinue \u2192"
+    },
+    {
+      "active": 489.49586747093724,
+      "hud": "CLOUDLAB\nAVAILABLE FUNDS\n$4,284.01\nPROFIT / SIM MIN\n+$30.56\nSERVICE\n100%\nCOMPANY\nLV 21\n1\n\u2630 Menu",
+      "objective": "Service target met \u00b7 Prepare for the next level",
+      "nodes": 318
+    },
+    {
+      "active": 549.8435674709445,
+      "hud": "CLOUDLAB\nAVAILABLE FUNDS\n$6,499.19\nPROFIT / SIM MIN\n+$32.39\nSERVICE\n100%\nCOMPANY\nLV 23\n\u2630 Menu",
+      "objective": "Service target met \u00b7 Prepare for the next level",
+      "nodes": 261
+    },
+    {
+      "active": 578.8521174709468,
+      "event": "CITY FEED \u00b7 INCOMING\nCITY FEED // TRENDING\nYour campaign went viral!\n\nCustomer demand is 50% higher. More capacity or Application Cache can help.\n\nDuration \u00b7 01:15 active play\n\nAdd capacity or cache repeated requests to handle the surge.\n\nContinue \u2192"
+    },
+    {
+      "active": 611.4009174709494,
+      "hud": "CLOUDLAB\nAVAILABLE FUNDS\n$9,135.76\nPROFIT / SIM MIN\n+$56.67\nMarketing traffic spike\n00:43\nPeak traffic \u00b7 100% served \u00b7 32.5/15s stable\nFinish with 15 seconds at \u226598% served \u00b7 \u226590% overall\n1\n\u2630 Menu",
+      "objective": "LV 26 \u00b7 Service target met \u00b7 Prepare for the next level",
+      "nodes": 623
+    },
+    {
+      "active": 653.8521174709518,
+      "event": "EVENT RESULTS\nCITY FEED // TRENDING\nMarketing campaign feedback\nContained\nRequests served\n100%\nNet profit\n$3,974.71\nDuration\n01:15\n\nYour system kept up with the event.\n\nContinue \u2192"
+    },
+    {
+      "active": 671.4014174709523,
+      "hud": "CLOUDLAB\nAVAILABLE FUNDS\n$12,465.65\nPROFIT / SIM MIN\n+$40.44\nSERVICE\n100%\nCOMPANY\nLV 29\n\u2630 Menu",
+      "objective": "Service target met \u00b7 Prepare for the next level",
+      "nodes": 317
+    },
+    {
+      "active": 731.6824174709549,
+      "hud": "CLOUDLAB\nAVAILABLE FUNDS\n$15,560.65\nPROFIT / SIM MIN\n+$46.10\nSERVICE\n100%\nCOMPANY\nLV 32\n\u2630 Menu",
+      "objective": "Service target met \u00b7 Prepare for the next level",
+      "nodes": 261
+    },
+    {
+      "active": 792.0299174709579,
+      "hud": "CLOUDLAB\nAVAILABLE FUNDS\n$18,374.87\nPROFIT / SIM MIN\n+$48.17\nSERVICE\n100%\nCOMPANY\nLV 34\n\u2630 Menu",
+      "objective": "Service target met \u00b7 Prepare for the next level",
+      "nodes": 620
+    },
+    {
+      "active": 800.1021172209583,
+      "event": "CITY FEED \u00b7 INCOMING\nRECOVERY LINK\nA rack went dark.\n\n1 physical server is unavailable. Reserved failover headroom can preserve service. Backups configured before a fault shorten replacement-host restoration.\n\nDuration \u00b7 01:30 active play\n\nHealthy spare servers can keep requests moving during recovery.\n\nContinue \u2192"
+    },
+    {
+      "active": 852.7499172209605,
+      "hud": "CLOUDLAB\nAVAILABLE FUNDS\n$18,770.55\nPROFIT / SIM MIN\n\u2212$0.80\nServer hardware fault\n00:38\nResponse \u00b7 0% served \u00b7 0/15s stable\nFinish with 15 seconds at \u226598% served \u00b7 \u226590% overall\n\u2630 Menu",
+      "objective": "LV 35 \u00b7 Reach 98% served \u00b7 CPU limits progress",
+      "nodes": 329
+    },
+    {
+      "active": 890.102117220963,
+      "event": "EVENT RESULTS\nRECOVERY LINK\nRecovery debrief\nSurvived\u2014improve this constraint\nRequests served\n0%\nNet loss\n\u2212$72.00\nDuration\n01:30\n\nCPU couldn\u2019t keep up. Consider an upgrade before the next surge.\n\nContinue \u2192"
+    },
+    {
+      "active": 915.1677172209644,
+      "hud": "CLOUDLAB\nAVAILABLE FUNDS\n$20,000.92\nPROFIT / SIM MIN\n+$51.36\nSERVICE\n100%\nCOMPANY\nLV 36\n1\n\u2630 Menu",
+      "objective": "Service target met \u00b7 Prepare for the next level",
+      "nodes": 263
+    },
+    {
+      "active": 975.4653172209669,
+      "hud": "CLOUDLAB\nAVAILABLE FUNDS\n$23,567.03\nPROFIT / SIM MIN\n+$53.48\nSERVICE\n100%\nCOMPANY\nLV 38\n\u2630 Menu",
+      "objective": "Service target met \u00b7 Prepare for the next level",
+      "nodes": 620
+    },
+    {
+      "active": 1015.102117220969,
+      "event": "CITY FEED \u00b7 INCOMING\nCITY FEED // TRENDING\nYour campaign went viral!\n\nCustomer demand is 50% higher. More capacity or Application Cache can help.\n\nDuration \u00b7 01:15 active play\n\nAdd capacity or cache repeated requests to handle the surge.\n\nContinue \u2192"
+    },
+    {
+      "active": 1037.701217220959,
+      "hud": "CLOUDLAB\nAVAILABLE FUNDS\n$27,930.39\nPROFIT / SIM MIN\n+$85.38\nMarketing traffic spike\n00:53\nPeak traffic \u00b7 100% served \u00b7 22.6/15s stable\nFinish with 15 seconds at \u226598% served \u00b7 \u226590% overall\n\u2630 Menu",
+      "objective": "LV 41 \u00b7 Service target met \u00b7 Prepare for the next level",
+      "nodes": 316
+    },
+    {
+      "active": 1090.1021172209205,
+      "event": "EVENT RESULTS\nCITY FEED // TRENDING\nMarketing campaign feedback\nContained\nRequests served\n100%\nNet profit\n$5,965.89\nDuration\n01:15\n\nYour system kept up with the event.\n\nContinue \u2192"
+    },
+    {
+      "active": 1100.035017220912,
+      "hud": "CLOUDLAB\nAVAILABLE FUNDS\n$32,757.03\nPROFIT / SIM MIN\n+$59.83\nSERVICE\n100%\nCOMPANY\nLV 44\n\u2630 Menu",
+      "objective": "Service target met \u00b7 Prepare for the next level",
+      "nodes": 261
+    },
+    {
+      "active": 1160.3160172208677,
+      "hud": "CLOUDLAB\nAVAILABLE FUNDS\n$37,022.31\nPROFIT / SIM MIN\n+$61.95\nSERVICE\n100%\nCOMPANY\nLV 46\n\u2630 Menu",
+      "objective": "Service target met \u00b7 Prepare for the next level",
+      "nodes": 620
+    },
+    {
+      "active": 1220.4802172208244,
+      "hud": "CLOUDLAB\nAVAILABLE FUNDS\n$40,827.68\nPROFIT / SIM MIN\n+$65.12\nSERVICE\n100%\nCOMPANY\nLV 49\n\u2630 Menu",
+      "objective": "Service target met \u00b7 Prepare for the next level",
+      "nodes": 317
+    },
+    {
+      "active": 1236.3521172208123,
+      "event": "CITY FEED \u00b7 INCOMING\nRECOVERY LINK\nA rack went dark.\n\n1 physical server is unavailable. Reserved failover headroom can preserve service. Backups configured before a fault shorten replacement-host restoration.\n\nDuration \u00b7 01:30 active play\n\nHealthy spare servers can keep requests moving during recovery.\n\nContinue \u2192"
+    },
+    {
+      "active": 1281.4501172207797,
+      "hud": "CLOUDLAB\nAVAILABLE FUNDS\n$41,870.27\nPROFIT / SIM MIN\n\u2212$0.80\nServer hardware fault\n00:45\nResponse \u00b7 0% served \u00b7 0/15s stable\nFinish with 15 seconds at \u226598% served \u00b7 \u226590% overall\n\u2630 Menu",
+      "objective": "LV 50 \u00b7 Reach 98% served \u00b7 CPU limits progress",
+      "nodes": 273
+    },
+    {
+      "active": 1326.3521172207477,
+      "event": "EVENT RESULTS\nRECOVERY LINK\nRecovery debrief\nSurvived\u2014improve this constraint\nRequests served\n0%\nNet loss\n\u2212$72.00\nDuration\n01:30\n\nCPU couldn\u2019t keep up. Consider an upgrade before the next surge.\n\nContinue \u2192"
+    },
+    {
+      "active": 1343.9348172207353,
+      "hud": "CLOUDLAB\nAVAILABLE FUNDS\n$42,952.23\nPROFIT / SIM MIN\n+$66.18\nSERVICE\n100%\nCOMPANY\nLV 50\n\u2630 Menu",
+      "objective": "Service target met \u00b7 Prepare for the next level",
+      "nodes": 620
+    },
+    {
+      "active": 1404.2655172206885,
+      "hud": "CLOUDLAB\nAVAILABLE FUNDS\n$47,656.92\nPROFIT / SIM MIN\n+$69.36\nSERVICE\n100%\nCOMPANY\nLV 53\n\u2630 Menu",
+      "objective": "Service target met \u00b7 Prepare for the next level",
+      "nodes": 318
+    },
+    {
+      "active": 1451.352117220654,
+      "event": "CITY FEED \u00b7 INCOMING\nRECOVERY LINK\nA rack went dark.\n\n1 physical server is unavailable. Reserved failover headroom can preserve service. Backups configured before a fault shorten replacement-host restoration.\n\nDuration \u00b7 01:30 active play\n\nHealthy spare servers can keep requests moving during recovery.\n\nContinue \u2192"
+    },
+    {
+      "active": 1466.3848172206424,
+      "hud": "CLOUDLAB\nAVAILABLE FUNDS\n$50,959.25\nPROFIT / SIM MIN\n\u2212$0.80\nServer hardware fault\n01:15\nResponse \u00b7 0% served \u00b7 0/15s stable\nFinish with 15 seconds at \u226598% served \u00b7 \u226590% overall\n\u2630 Menu",
+      "objective": "LV 55 \u00b7 Reach 98% served \u00b7 CPU limits progress",
+      "nodes": 273
+    },
+    {
+      "active": 1526.6991172205967,
+      "hud": "CLOUDLAB\nAVAILABLE FUNDS\n$50,911.46\nPROFIT / SIM MIN\n\u2212$0.80\nServer hardware fault\n00:15\nResponse \u00b7 0% served \u00b7 0/15s stable\nFinish with 15 seconds at \u226598% served \u00b7 \u226590% overall\n\u2630 Menu",
+      "objective": "LV 55 \u00b7 Reach 98% served \u00b7 CPU limits progress",
+      "nodes": 626
+    },
+    {
+      "active": 1541.352117220586,
+      "event": "EVENT RESULTS\nRECOVERY LINK\nRecovery debrief\nSurvived\u2014improve this constraint\nRequests served\n0%\nNet loss\n\u2212$72.00\nDuration\n01:30\n\nCPU couldn\u2019t keep up. Consider an upgrade before the next surge.\n\nContinue \u2192"
+    },
+    {
+      "active": 1589.0336172205502,
+      "hud": "CLOUDLAB\nAVAILABLE FUNDS\n$54,917.02\nPROFIT / SIM MIN\n+$72.53\nSERVICE\n100%\nCOMPANY\nLV 56\n\u2630 Menu",
+      "objective": "Service target met \u00b7 Prepare for the next level",
+      "nodes": 317
+    },
+    {
+      "active": 1649.231117220506,
+      "hud": "CLOUDLAB\nAVAILABLE FUNDS\n$59,427.76\nPROFIT / SIM MIN\n+$75.71\nSERVICE\n100%\nCOMPANY\nLV 59\n\u2630 Menu",
+      "objective": "Service target met \u00b7 Prepare for the next level",
+      "nodes": 261
+    },
+    {
+      "active": 1666.3521172204926,
+      "event": "CITY FEED \u00b7 INCOMING\nCITY FEED // TRENDING\nYour campaign went viral!\n\nCustomer demand is 50% higher. More capacity or Application Cache can help.\n\nDuration \u00b7 01:15 active play\n\nAdd capacity or cache repeated requests to handle the surge.\n\nContinue \u2192"
+    },
+    {
+      "active": 1711.3670172204602,
+      "hud": "CLOUDLAB\nAVAILABLE FUNDS\n$66,350.74\nPROFIT / SIM MIN\n+$118.72\nMarketing traffic spike\n00:30\nPeak traffic \u00b7 100% served \u00b7 45.1/15s stable\nFinish with 15 seconds at \u226598% served \u00b7 \u226590% overall\n\u2630 Menu",
+      "objective": "LV 62 \u00b7 Service target met \u00b7 Prepare for the next level",
+      "nodes": 622
+    },
+    {
+      "active": 1741.3521172204382,
+      "event": "EVENT RESULTS\nCITY FEED // TRENDING\nMarketing campaign feedback\nContained\nRequests served\n100%\nNet profit\n$8,162.07\nDuration\n01:16\n\nYour system kept up with the event.\n\nContinue \u2192"
+    },
+    {
+      "active": 1771.3676172204168,
+      "hud": "CLOUDLAB\nAVAILABLE FUNDS\n$72,050.49\nPROFIT / SIM MIN\n+$82.06\nSERVICE\n100%\nCOMPANY\nLV 65\n\u2630 Menu",
+      "objective": "Service target met \u00b7 Prepare for the next level",
+      "nodes": 317
+    }
+  ],
+  "errors": [],
+  "candidate": "Iterative UI candidate before final balance activation; fixes found here are rechecked separately."
+}

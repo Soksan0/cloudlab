@@ -18,7 +18,7 @@ export type EventStatistics = {
   gross: number; expenses: number; potentialGross: number; extraRequests: number;
   missedByStage: Record<LossStage, number>; partial: boolean
 }
-export type EventReport = EventStatistics & { id: string; kind: IncidentKind; title: string; endedAt: number; dominantStage: LossStage | null }
+export type EventReport = EventStatistics & { id: string; kind: IncidentKind; title: string; endedAt: number; dominantStage: LossStage | null; outcome?:'contained'|'survived' }
 export type AchievementDefinition = { id: string; name: string; description: string; reward: number }
 
 export type UpgradeDefinition = {
@@ -36,6 +36,7 @@ export type UpgradeDefinition = {
 export type IncidentKind = 'marketing' | 'hardware' | 'bot' | 'billing'
 
 export type Incident = {
+  encounter?:{revision:1;early:boolean;finalStreak:number}
   kind: IncidentKind
   title: string
   detail: string
@@ -123,7 +124,9 @@ export type AdvisorRecommendation = {
 }
 
 export type GameState = {
-  version: 6
+  version: 7
+  balance?: BalanceConfig | null
+  legacyTerms?: {servers:number;cloud:number;ai:number;checkpointEnd:number}
   uiRevision?: 2
   workloadOffset:number;companyLevel:number;levelProgress:number;levelQuota:number;fleet:{servers:number;storageGroups:number;networkLinks:number};budgetGuard:{enabled:boolean;lossSeconds:number;status:'healthy'|'warning'|'recovering'};claimedAchievementIDs:string[];claimedCheckpointLevel:number;eventCheckpoint:number;eventQuietSeconds:number;activeSeconds:number;aiLaunchLevel:number|null
   revenue: { gross: number; expenses: number; grants: number; purchases:number; rewards:number; opening:number }
@@ -166,3 +169,5 @@ export type GameState = {
   metrics: Metrics
   logs: LogEntry[]
 }
+
+export type BalanceConfig={hardware:2|4;fleet:8|16|32;coefficient:.1|.2|.3;maintenance:.05|.1;rentalLimits?:true}
